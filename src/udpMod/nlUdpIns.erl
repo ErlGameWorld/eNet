@@ -1,35 +1,15 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%--------------------------------------------------------------------
+-module(nlUdpIns).
 
--module(nlUdp).
-
--behaviour(gen_server).
-
--export([server/4
+-export([
+   server/4
    , count_peers/1
    , stop/1
 ]).
 
-%% gen_server callbacks
--export([init/1
-   , handle_call/3
-   , handle_cast/2
-   , handle_info/2
+-export([
+   init/1
+   , handleMsg/2
    , terminate/2
-   , code_change/3
 ]).
 
 -record(state, {proto, sock, port, peers, mfa}).
@@ -80,18 +60,15 @@ init([Proto, Port, Opts, MFA]) ->
          {stop, Reason}
    end.
 
-handle_call(count_peers, _From, State = #state{peers = Peers}) ->
+handleMsg(count_peers, _From, State = #state{peers = Peers}) ->
    {reply, maps:size(Peers) div 2, State, hibernate};
 
-handle_call(Req, _From, State) ->
+handleMsg(Req, _From, State) ->
    ?ERROR_MSG("unexpected call: ~p", [Req]),
    {reply, ignored, State}.
 
-handle_cast(Msg, State) ->
-   ?ERROR_MSG("unexpected cast: ~p", [Msg]),
-   {noreply, State}.
 
-handle_info({udp, Sock, IP, InPortNo, Packet},
+handleMsg({udp, Sock, IP, InPortNo, Packet},
    State = #state{sock = Sock, peers = Peers, mfa = {M, F, Args}}) ->
    Peer = {IP, InPortNo},
    case maps:find(Peer, Peers) of
@@ -116,19 +93,19 @@ handle_info({udp, Sock, IP, InPortNo, Packet},
          end
    end;
 
-handle_info({udp_passive, Sock}, State) ->
+handleMsg({udp_passive, Sock}, State) ->
    %% TODO: rate limit here?
    inet:setopts(Sock, [{active, 100}]),
    {noreply, State, hibernate};
 
-handle_info({'DOWN', _MRef, process, DownPid, _Reason}, State = #state{peers = Peers}) ->
+handleMsg({'DOWN', _MRef, process, DownPid, _Reason}, State = #state{peers = Peers}) ->
    case maps:find(DownPid, Peers) of
       {ok, Peer} ->
          {noreply, erase_peer(Peer, DownPid, State)};
       error -> {noreply, State}
    end;
 
-handle_info({datagram, Peer = {IP, Port}, Packet}, State = #state{sock = Sock}) ->
+handleMsg({datagram, Peer = {IP, Port}, Packet}, State = #state{sock = Sock}) ->
    case gen_udp:send(Sock, IP, Port, Packet) of
       ok -> ok;
       {error, Reason} ->
@@ -136,19 +113,13 @@ handle_info({datagram, Peer = {IP, Port}, Packet}, State = #state{sock = Sock}) 
    end,
    {noreply, State};
 
-handle_info(Info, State) ->
+handleMsg(Info, State) ->
    ?ERROR_MSG("unexpected info: ~p", [Info]),
    {noreply, State}.
 
 terminate(_Reason, #state{sock = Sock}) ->
    gen_udp:close(Sock).
 
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.
-
-%%--------------------------------------------------------------------
-%% Internel functions
-%%--------------------------------------------------------------------
 
 store_peer(Peer, Pid, State = #state{peers = Peers}) ->
    State#state{peers = maps:put(Pid, Peer, maps:put(Peer, Pid, Peers))}.

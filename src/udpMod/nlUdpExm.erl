@@ -1,10 +1,10 @@
--module(nlTcpAcceptorExm).
+-module(nlUdpExm).
 
 -compile(inline).
 -compile({inline_size, 128}).
 
 -export([
-   start_link/3
+   start_link/4
    , init_it/3
    , system_code_change/4
    , system_continue/3
@@ -13,9 +13,9 @@
 ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genExm  start %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec start_link(module(), term(), [proc_lib:spawn_option()]) -> {ok, pid()}.
-start_link(Name, Args, SpawnOpts) ->
-   proc_lib:start_link(?MODULE, init_it, [Name, self(), Args], infinity, SpawnOpts).
+-spec start_link(module(), term(), module(), [proc_lib:spawn_option()]) -> {ok, pid()}.
+start_link(ServerName, LSock, ConMod, SpawnOpts) ->
+   proc_lib:start_link(?MODULE, init_it, [ServerName, self(), {LSock, ConMod}], infinity, SpawnOpts).
 
 init_it(Name, Parent, Args) ->
    case safeRegister(Name) of
@@ -50,7 +50,7 @@ safeRegister(Name) ->
    end.
 
 moduleInit(Parent, Args) ->
-   case nlTcpAcceptorIns:init(Args) of
+   case nlTcpAcceptor:init(Args) of
       {ok, State} ->
          proc_lib:init_ack(Parent, {ok, self()}),
          loop(Parent, State);
@@ -66,7 +66,7 @@ loop(Parent, State) ->
       {'EXIT', Parent, Reason} ->
          terminate(Reason, State);
       Msg ->
-         case nlTcpAcceptorIns:handleMsg(Msg, State) of
+         case nlTcpAcceptor:handleMsg(Msg, State) of
             {ok, NewState} ->
                loop(Parent, NewState);
             {stop, Reason} ->
@@ -75,7 +75,7 @@ loop(Parent, State) ->
    end.
 
 terminate(Reason, State) ->
-   nlTcpAcceptorIns:terminate(Reason, State),
+   nlTcpAcceptor:terminate(Reason, State),
    exit(Reason).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genExm  end %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

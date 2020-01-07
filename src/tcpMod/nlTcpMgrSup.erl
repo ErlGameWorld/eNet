@@ -5,10 +5,10 @@
 
 -export([
    start_link/0
-   , listener/1
-   , acceptor_sup/1
-   , connection_sup/1
    , init/1
+   , startChild/1
+   , terminateChild/1
+   , deleteChild/1
 ]).
 
 
@@ -16,50 +16,34 @@
 start_link() ->
    supervisor:start_link({local, ?nlTcpMgrSup}, ?MODULE, undefined).
 
-%% sup_flags() = #{strategy => strategy(),             % optional
-%%                 intensity => non_neg_integer(),     % optional
-%%                 period => pos_integer()}            % optional
-%% child_spec() = #{id => child_id(),                  % mandatory
-%%                  start => mfargs(),                 % mandatory
-%%                  restart => restart(),              % optional
-%%                  shutdown => shutdown(),            % optional
-%%                  type => worker(),                  % optional
-%%                  modules => modules()}              % optional
-
 init(_Args) ->
-   SupFlags = #{
+   SupFlag = #{
       strategy => one_for_one,
       intensity => 100,
       period => 3600
    },
 
-   NlTcpAcceptorSup = #{
+   TcpAcceptorSup = #{
       id => nlTcpAcceptorSup,
       start => {nlTcpAcceptorSup, start_link, []},
       restart => permanent,
-      shutdown => 5000,
-      type => supervior,
+      shutdown => infinity,
+      type => supervisor,
       modules => [nlTcpAcceptorSup]
    },
-   {ok, {SupFlags, [NlTcpAcceptorSup]}}.
+   {ok, {SupFlag, [TcpAcceptorSup]}}.
 
-%% @doc Get listener.
--spec(listener(pid()) -> pid()).
-listener(Sup) ->
-   child_pid(Sup, listener).
+-spec startChild(supervisor:child_spec()) -> {ok, pid()} | {error, term()}.
+startChild(ChildSpec) ->
+   supervisor:start_child(?nlTcpMgrSup, ChildSpec).
 
-%% @doc Get connection supervisor.
--spec(connection_sup(pid()) -> pid()).
-connection_sup(Sup) -> child_pid(Sup, connection_sup).
+-spec terminateChild(supervisor:child_id()) -> 'ok' | {'error', term()}.
+terminateChild(SpecId) ->
+   supervisor:terminate_child(?nlTcpMgrSup, SpecId).
 
-%% @doc Get acceptor supervisor.
--spec(acceptor_sup(pid()) -> pid()).
-acceptor_sup(Sup) -> child_pid(Sup, acceptor_sup).
-
-%% @doc Get child pid with id.
-child_pid(Sup, ChildId) ->
-   hd([Pid || {Id, Pid, _, _}
-      <- supervisor:which_children(Sup), Id =:= ChildId]).
+-spec deleteChild(supervisor:child_id()) -> 'ok' | {'error', term()}.
+deleteChild(SpecId) ->
+   supervisor:delete_child(?nlTcpMgrSup, SpecId).
 
 
 

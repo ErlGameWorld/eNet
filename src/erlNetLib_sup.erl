@@ -1,15 +1,15 @@
 -module(erlNetLib_sup).
-
 -behaviour(supervisor).
 
--export([start_link/0]).
+-export([
+   start_link/0
+   , init/1
+   , startChild/1
+]).
 
--export([init/1]).
-
--define(SERVER, ?MODULE).
-
+-spec(start_link() -> {ok, pid()} | {error, term()}).
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% sup_flags() = #{strategy => strategy(),             % optional
 %%                 intensity => non_neg_integer(),     % optional
@@ -20,24 +20,11 @@ start_link() ->
 %%                  shutdown => shutdown(),            % optional
 %%                  type => worker(),                  % optional
 %%                  modules => modules()}              % optional
-init1([]) ->
-    SupFlags = #{strategy => one_for_all,
-                 intensity => 0,
-                 period => 1},
-    ChildSpecs = [],
-    {ok, {SupFlags, ChildSpecs}}.
-
 
 init([]) ->
-   SupFlags = #{strategy => one_for_one, intensity  => 1000, period => 3600},
-   NetListen = #{id => netListen, start => {netListen, start_link, []}, restart => permanent, shutdown => 5000, type => supervisor, modules => [netListen]},
-   NetAcceptor = #{id => netAcceptor, start => {netAcceptor, start_link, []}, restart => permanent, shutdown => 5000, type => supervisor, modules => [netAcceptor]},
-   {ok, {SupFlags, [NetListen, NetAcceptor]}}.
+   SupFlag = #{strategy => one_for_one, intensity  => 1000, period => 3600},
+   {ok, {SupFlag, []}}.
 
-
-%%====================================================================
-%% Internal functions
-%%====================================================================
--spec startChild(supervisor:child_spec()) -> {ok, Pid} | {error, term()}.
+-spec startChild(supervisor:child_spec()) -> {ok, pid()} | {error, term()}.
 startChild(ChildSpec) ->
    supervisor:start_child(?MODULE, ChildSpec).

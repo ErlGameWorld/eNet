@@ -2,9 +2,15 @@
 
 -compile([export_all]).
 
--spec mergeOpts(Defaults :: #{}, Options :: #{}) -> #{}.
+-spec mergeOpts(Defaults :: list(), Options :: list()) -> list().
 mergeOpts(Defaults, Options) ->
-   maps:merge(Defaults, Options).
+   lists:foldl(
+      fun({Opt, Val}, Acc) ->
+         lists:keystore(Opt, 1, Acc, {Opt, Val});
+         (Opt, Acc) ->
+            lists:usort([Opt | Acc])
+      end,
+      Defaults, Options).
 
 mergeAddr({Addr, _Port}, SockOpts) ->
    lists:keystore(ip, 1, SockOpts, {ip, Addr});
@@ -14,6 +20,17 @@ mergeAddr(_Port, SockOpts) ->
 getPort({_Addr, Port}) -> Port;
 getPort(Port) -> Port.
 
+%% Parse Address
+fixAddr({Addr, Port}) when is_list(Addr), is_integer(Port) ->
+   {ok, IPAddr} = inet:parse_address(Addr),
+   {IPAddr, Port};
+fixAddr({Addr, Port}) when is_tuple(Addr), is_integer(Port) ->
+   case isIpv4OrIpv6(Addr) of
+      true  -> {Addr, Port};
+      false -> error({invalid_ipaddr, Addr})
+   end;
+fixAddr(Port) when is_integer(Port) ->
+   Port.
 
 parseAddr({Addr, Port}) when is_list(Addr), is_integer(Port) ->
    {ok, IPAddr} = inet:parse_address(Addr),
@@ -78,4 +95,7 @@ getListValue(Key, List, Default) ->
       {Key, Value} ->
          Value
    end.
+
+serverName(PoolName, Index) ->
+   list_to_atom(atom_to_list(PoolName) ++ "_" ++ integer_to_list(Index)).
 

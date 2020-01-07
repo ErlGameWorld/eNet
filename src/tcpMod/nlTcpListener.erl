@@ -1,116 +1,143 @@
 -module(nlTcpListener).
 -include("erlNetLib.hrl").
 
--behaviour(gen_server).
+%% 该文件不可热更新
 
--export([start_link/3]).
+-compile(inline).
+-compile({inline_size, 128}).
 
 -export([
-   options/1
-   , get_port/1
+   start_link/4
+   , getOpts/1
+   , getListenPort/1
+
+   , init_it/3
+   , system_code_change/4
+   , system_continue/3
+   , system_get_state/1
+   , system_terminate/4
 ]).
 
-%% gen_server callbacks
--export([init/1
-   , handle_call/3
-   , handle_cast/2
-   , handle_info/2
-   , terminate/2
-   , code_change/3
-]).
+-spec(start_link(atom(), listenOn(), module(), [listenOpt()]) -> {ok, pid()} | ignore | {error, term()}).
+start_link(ListenName, ListenOn, ConMod, ListenOpt) ->
+   proc_lib:start_link(?MODULE, init_it, [ListenName, self(), {ListenOn, ConMod, ListenOpt}], infinity, []).
+
+init_it(Name, Parent, Args) ->
+   case safeRegister(Name) of
+      true ->
+         process_flag(trap_exit, true),
+         moduleInit(Parent, Args);
+      {false, Pid} ->
+         proc_lib:init_ack(Parent, {error, {already_started, Pid}})
+   end.
+
+-spec system_code_change(term(), module(), undefined | term(), term()) -> {ok, term()}.
+system_code_change(State, _Module, _OldVsn, _Extra) ->
+   {ok, State}.
+
+-spec system_continue(pid(), [], {module(), atom(), pid(), term()}) -> ok.
+system_continue(_Parent, _Debug, {Parent, State}) ->
+   loop(Parent, State).
+
+-spec system_get_state(term()) -> {ok, term()}.
+system_get_state(State) ->
+   {ok, State}.
+
+-spec system_terminate(term(), pid(), [], term()) -> none().
+system_terminate(Reason, _Parent, _Debug, _State) ->
+   exit(Reason).
+
+safeRegister(Name) ->
+   try register(Name, self()) of
+      true -> true
+   catch
+      _:_ -> {false, whereis(Name)}
+   end.
+
+moduleInit(Parent, Args) ->
+   case init(Args) of
+      {ok, State} ->
+         proc_lib:init_ack(Parent, {ok, self()}),
+         loop(Parent, State);
+      {stop, Reason} ->
+         proc_lib:init_ack(Parent, {error, Reason}),
+         exit(Reason)
+   end.
+
+loop(Parent, State) ->
+   receive
+      {system, From, Request} ->
+         sys:handle_system_msg(Request, From, Parent, ?MODULE, [], {Parent, State});
+      {'EXIT', Parent, Reason} ->
+         terminate(Reason, State);
+      Msg ->
+         case handleMsg(Msg, State) of
+            {ok, NewState} ->
+               loop(Parent, NewState);
+            {stop, Reason} ->
+               terminate(Reason, State),
+               exit(Reason)
+         end
+   end.
+
 
 -record(state, {
-   serverName :: atom()
-   , listenAddr :: inet:ip_address()
+   listenAddr :: inet:ip_address()
    , listenPort :: inet:port_number()
    , lSock :: inet:socket()
    , opts :: [listenOpt()]
 }).
 
 -define(ACCEPTOR_POOL, 16).
--define(DEFAULT_TCP_OPTIONS,
-   [{nodelay, true},
-      {reuseaddr, true},
-      {send_timeout, 30000},
-      {send_timeout_close, true}
-   ]).
+-define(DEFAULT_TCP_OPTIONS, [{nodelay, true}, {reuseaddr, true}, {send_timeout, 30000}, {send_timeout_close, true}]).
 
--spec(start_link(atom(), listenOn(), [listenOpt()]) -> {ok, pid()} | ignore | {error, term()}).
-start_link(ListenName, ListenOn, Opts) ->
-   gen_server:start_link({local, ListenName}, ?MODULE, {ListenName, ListenOn, Opts}, []).
-
--spec(options(pid()) -> [esockd:option()]).
-options(Listener) ->
-   gen_server:call(Listener, options).
-
--spec(get_port(pid()) -> inet:port_number()).
-get_port(Listener) ->
-   gen_server:call(Listener, get_port).
-
-%%--------------------------------------------------------------------
-%% gen_server callbacks
-%%--------------------------------------------------------------------
-
-init({Proto, ListenOn, Opts}) ->
-   Port = port(ListenOn),
+init({ListenOn, ConMod, ListenOpt}) ->
    process_flag(trap_exit, true),
-   SockOpts = merge_addr(ListenOn, sockopts(Opts)),
+   Port = nlNetCom:getPort(ListenOn),
+   SockOpts = ?getListValue(tcpOpts, ListenOpt, []),
+   LastSockOpts = nlNetCom:mergeOpts(?DEFAULT_TCP_OPTIONS, SockOpts),
    %% Don't active the socket...
-   case gen_tcp:listen(Port, [{active, false} | lists:keydelete(active, 1, SockOpts)]) of
+   case gen_tcp:listen(Port, [{active, false} | lists:keydelete(active, 1, LastSockOpts)]) of
       {ok, LSock} ->
-         AcceptorNum = ?getListValue(acceptors, Opts, ?ACCEPTOR_POOL),
-         startAcceptor(AcceptorNum, LSock),
+         AcceptorNum = ?getListValue(acceptors, ListenOpt, ?ACCEPTOR_POOL),
+         startAcceptor(AcceptorNum, LSock, ConMod),
          {ok, {LAddr, LPort}} = inet:sockname(LSock),
-         {ok, #state{proto = Proto, listen_on = ListenOn, options = Opts,
-            lsock = LSock, laddr = LAddr, lport = LPort}};
+         ?WARN(nlTcpListener, " success to listen on ~p ~n", [Port]),
+         {ok, #state{listenAddr = LAddr, listenPort = LPort, lSock = LSock, opts = [{acceptors, AcceptorNum}, {tcpOpts, LastSockOpts}]}};
       {error, Reason} ->
-         error_logger:error_msg("~s failed to listen on ~p - ~p (~s)",
-            [Proto, Port, Reason, inet:format_error(Reason)]),
+         ?WARN(nlTcpListener, " failed to listen on ~p - ~p (~s) ~n", [Port, Reason, inet:format_error(Reason)]),
          {stop, Reason}
    end.
 
-sockopts(Opts) ->
-   TcpOpts = proplists:get_value(tcp_options, Opts, []),
-   esockd_util:merge_opts(?DEFAULT_TCP_OPTIONS, TcpOpts).
+handleMsg({'$gen_call', From, miOpts}, #state{opts = Opts} = State) ->
+   gen_server:reply(From, Opts),
+   {ok, State};
 
-port(Port) when is_integer(Port) -> Port;
-port({_Addr, Port}) -> Port.
+handleMsg({'$gen_call', From, miListenPort}, #state{listenPort = LPort} = State) ->
+   gen_server:reply(From, LPort),
+   {ok, State};
 
-merge_addr(Port, SockOpts) when is_integer(Port) ->
-   SockOpts;
-merge_addr({Addr, _Port}, SockOpts) ->
-   lists:keystore(ip, 1, SockOpts, {ip, Addr}).
-
-handle_call(options, _From, State = #state{options = Opts}) ->
-   {reply, Opts, State};
-
-handle_call(get_port, _From, State = #state{lport = LPort}) ->
-   {reply, LPort, State};
-
-handle_call(Req, _From, State) ->
-   error_logger:error_msg("[~s] unexpected call: ~p", [?MODULE, Req]),
+handleMsg(_Msg, State) ->
+   ?WARN(nlTcpListener, "[~s] unexpected info: ~p ~n", [?MODULE, _Msg]),
    {noreply, State}.
 
-handle_cast(Msg, State) ->
-   error_logger:error_msg("[~s] unexpected cast: ~p", [?MODULE, Msg]),
-   {noreply, State}.
+terminate(_Reason, #state{lSock = LSock, listenAddr = Addr, listenPort = Port}) ->
+   ?WARN(nlTcpListener, "stopped on ~s:~p ~n", [inet:ntoa(Addr),Port]),
+   %% 关闭这个监听LSock  监听进程收到tcp_close 然后终止acctptor进程
+   catch port_close(LSock),
+   ok.
 
-handle_info(Info, State) ->
-   error_logger:error_msg("[~s] unexpected info: ~p", [?MODULE, Info]),
-   {noreply, State}.
-
-terminate(_Reason, #state{proto = Proto, listen_on = ListenOn,
-   lsock = LSock, laddr = Addr, lport = Port}) ->
-   error_logger:info_msg("~s stopped on ~s~n", [Proto, esockd_net:format({Addr, Port})]),
-   esockd_rate_limiter:delete({listener, Proto, ListenOn}),
-   esockd_server:del_stats({Proto, ListenOn}),
-   esockd_transport:fast_close(LSock).
-
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.
-
-startAcceptor(0, _LSock) ->
+startAcceptor(0, _LSock, _ConMod) ->
    ok;
-startAcceptor(N, LSock) ->
-   nlTcpAcceptorSup:start_acceptor(nlTcpAcceptorSup, LSock),
-   startAcceptor(N - 1, LSock).
+startAcceptor(N, LSock, ConMod) ->
+   nlTcpAcceptorSup:startChild([LSock, ConMod, []]),
+   startAcceptor(N - 1, LSock, ConMod).
+
+-spec getOpts(pid()) -> [listenOpt()].
+getOpts(Listener) ->
+   gen_server:call(Listener, miOpts).
+
+-spec getListenPort(pid()) -> inet:port_number().
+getListenPort(Listener) ->
+   gen_server:call(Listener, miListenPort).
+
