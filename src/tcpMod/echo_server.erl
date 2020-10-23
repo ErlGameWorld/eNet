@@ -62,10 +62,9 @@ handle_cast(_Msg, State) ->
    io:format("handle_cast for______ ~p~n", [_Msg]),
     {noreply, State}.
 
-handle_info({inet_async, Sock, _Ref, {ok, Data}},
-            State = #state{transport = Transport, socket = _Sock}) ->
+handle_info({inet_async, Sock, _Ref, {ok, Data}}, State = #state{transport = Transport, socket = _Sock}) ->
     {ok, Peername} = inet:peername(Sock),
-    %% io:format("Data from ~p: ~s~n", [Peername, Data]),
+    io:format("packet:~p  Data from ~p: ~s~n", [inet:getopts(Sock, [packet]), Peername, Data]),
     prim_inet:send(Sock, Data),
     prim_inet:async_recv(Sock, 0, -1),
     {noreply, State};
