@@ -1,11 +1,11 @@
--module(erlNetLib_app).
+-module(eNet_app).
 
 -behaviour(application).
 
 -export([start/2, stop/1]).
 
 start(_StartType, _StartArgs) ->
-    erlNetLib_sup:start_link().
+    eNet_sup:start_link().
 
 stop(_State) ->
     ok.

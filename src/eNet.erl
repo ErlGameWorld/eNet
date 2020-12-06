@@ -1,6 +1,6 @@
--module(erlNetLib).
+-module(eNet).
 
--include("erlNetLib.hrl").
+-include("eNet.hrl").
 
 -define(TCP_DEFAULT_OPTIONS, [
    binary
@@ -21,7 +21,7 @@
 
 -spec start() -> ok.
 start() ->
-   {ok, _} = application:ensure_all_started(erlNetLib),
+   {ok, _} = application:ensure_all_started(eNet),
    ok.
 
 %% add a TCP listener
@@ -37,7 +37,7 @@ addTcpLr(ListenName, AddrPort, ConMod, ListenOpt) ->
             type => supervisor,
             modules => [?nlTcpMgrSup]
          },
-         {ok, _Pid} = erlNetLib_sup:startChild(TcpMgrSupSpec);
+         {ok, _Pid} = eNet_sup:startChild(TcpMgrSupSpec);
       _ ->
          ignore
    end,

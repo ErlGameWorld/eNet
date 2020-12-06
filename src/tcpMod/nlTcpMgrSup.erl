@@ -1,5 +1,5 @@
 -module(nlTcpMgrSup).
--include("erlNetLib.hrl").
+-include("eNet.hrl").
 
 -behaviour(supervisor).
 

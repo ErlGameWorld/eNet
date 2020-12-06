@@ -1,5 +1,5 @@
 -module(nlTcpAcceptor).
--include("erlNetLib.hrl").
+-include("eNet.hrl").
 -compile(inline).
 -compile({inline_size, 128}).
 

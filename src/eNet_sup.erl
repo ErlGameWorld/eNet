@@ -1,4 +1,4 @@
--module(erlNetLib_sup).
+-module(eNet_sup).
 -behaviour(supervisor).
 
 -export([
