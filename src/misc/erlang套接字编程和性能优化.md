@@ -1,4 +1,5 @@
-#### erlang 各种 优化设置 
+#### erlang 各种 优化设置
+
      一、 erl启动时参数:
     +K true  开启epoll调度，在linux中开启epoll，会大大增加调度的效率
     +A 100   异步线程池，为某些port调用服
@@ -92,8 +93,9 @@
         发送高低水位：{high_watermark, 128 * 1024} | {low_watermark, 64 * 1024}，辅助delay_send使用，delay_send的聚合缓冲区大小为high_watermark，数据缓存到high_watermark后，将阻塞port_command，使用send发送数据，直到缓冲区大小降低到low_watermark后，解除阻塞，通常这些值越大越好，但erlang虚拟机允许设置的最大值不超过128K
         发送缓冲大小：{sndbuf, 16 * 1024}，操作系统对套接字的发送缓冲大小，在延迟发送时有效，越大越好，但有极值
         接收缓冲大小：{recbuf, 16 * 1024}，操作系统对套接字的接收缓冲大小
-        
+
 #### Erlang 虚拟机调优
+
     目录
     SMP
     Schedulers
@@ -109,38 +111,27 @@
     Shutdown Time
     Riak 是用Erlang语言写的,运行在Erlang虚拟机之上.所以Erlang虚拟机的调优对Riak的性能优化就显得尤为重要. Erlang虚拟机本身提供了非常多的配置参数对性能调优, Riak支持其中的一部分参数,你可以在每个node的Riak配置文件中进行设置.
 
+下表列出了其中的一部分,左边一列是Erlang中的参数名称, 右边一列是在Riak中的参数名称. Erlang parameter Riak parameter +A erlang.async_threads +K erlang.K +P
+erlang.process_limit +Q erlang.max_ports +S erlang.schedulers.total, erlang.schedulers.online +W erlang.W +a
+erlang.async_threads.stack_size +e erlang.max_ets_tables +scl erlang.schedulers.compaction_of_load +sfwi
+erlang.schedulers.force_wakeup_interval -smp erlang.smp +sub erlang.schedulers.utilization_balancing +zdbbl
+erlang.distribution_buffer_size -kernel net_ticktime erlang.distribution.net_ticktime -env FULLSWEEP_AFTER
+erlang.fullsweep_after -env ERL_CRASH_DUMP erlang.crash_dump -env ERL_MAX_ETS_TABLES erlang.max_ets_tables -name
+nodename Note on upgrading to 2.0 在Riak2.0版本之前, Erlang虚拟机相关的参数放在配置文件 vm.args 里面. 在2.0及之后的版本中, 所有Erlang虚拟机相关的配置参数放在配置文件
+riak.conf 里面. 如果你从Riak2.0之前的版本升级到Riak 2.0, 你仍然可以继续使用旧的配置文件 vm.args. 但是, 如果你同时设置了配置文件 vm.args 和riak.conf, 在
+vm.args里面的配置将会覆盖riak.conf里面的配置.
 
-下表列出了其中的一部分,左边一列是Erlang中的参数名称, 右边一列是在Riak中的参数名称.
-Erlang parameter	Riak parameter
-+A	erlang.async_threads
-+K	erlang.K
-+P	erlang.process_limit
-+Q	erlang.max_ports
-+S	erlang.schedulers.total, erlang.schedulers.online
-+W	erlang.W
-+a	erlang.async_threads.stack_size
-+e	erlang.max_ets_tables
-+scl	erlang.schedulers.compaction_of_load
-+sfwi	erlang.schedulers.force_wakeup_interval
--smp	erlang.smp
-+sub	erlang.schedulers.utilization_balancing
-+zdbbl	erlang.distribution_buffer_size
--kernel net_ticktime	erlang.distribution.net_ticktime
--env FULLSWEEP_AFTER	erlang.fullsweep_after
--env ERL_CRASH_DUMP	erlang.crash_dump
--env ERL_MAX_ETS_TABLES	erlang.max_ets_tables
--name	nodename
-Note on upgrading to 2.0
-在Riak2.0版本之前, Erlang虚拟机相关的参数放在配置文件 vm.args 里面. 在2.0及之后的版本中, 所有Erlang虚拟机相关的配置参数放在配置文件 riak.conf 里面. 如果你从Riak2.0之前的版本升级到Riak 2.0, 你仍然可以继续使用旧的配置文件 vm.args. 但是, 如果你同时设置了配置文件 vm.args 和riak.conf,  在 vm.args里面的配置将会覆盖riak.conf里面的配置.
-##### SMP 
+##### SMP
+
     有些操作系统提供Erlang虚拟机对称多处理器能力(SMP)以利用多处理器硬件架构的优势. SMP的支持可以通过设置erlang.smp参数来打开和关闭, 默认是打开的. 下面的例子是关闭SMP的支持.
     riak.conf
     erlang.smp = disable
     由于Riak也可以运行在一些不支持SMP的操作系统上, 所以在使用之前需要确认操作系统是否支持SMP,如果操作系统本身不支持,那么需要在启动Riak集群之前在配置文件riak.conf中关闭SMP的选项.
     
     比较安全的一个选择是把erlang.smp设置成auto, 这个选项会指示Erlang虚拟机启动SMP支持之前检查操作系统是否支持以及是否有一个以上的逻辑处理器,只有这两个条件都满足的时候,Erlang虚拟机才启动SMP支持.
-    
+
 ##### Schedulers
+
     Note on missing scheduler flags
     We recommend that all users set the +sfwi to 500 (milliseconds) and the +sclflag to false if using the older, vm.args-based configuration system. If you are using the new, riak.conf-based configuration system, the corresponding parameters are erlang.schedulers.force_wakeup_interval anderlang.schedulers.compaction_of_load.
     Please note that you will need to uncomment the appropriate lines in your riak.conf for this configuration to take effect.
@@ -151,72 +142,86 @@ Note on upgrading to 2.0
     如果两个参数中的任意一个被设置成负数, 那么意味着这个参数值将会被设成默认配置的处理器数量(如果scheduler.total是负数)或者可用的处理器数量(如果schedulers.online是负数) 减去配置的负值. 比如, 如果机器配置有100个cpu(cores)然后参数schedulers.total配置为-50, 计算以后的值就是50. 
     如果两个参数中的任意一个被设置为0,两个值都会被重新设为默认值.
     如果SMP支持被关闭, 比如erlang.smp被设成disabled或者设成auto 但是机器本身不支持SMP或者机器只有一个逻辑处理器,那么两个参数schedulers.total 和 schedulers.online都将会被忽略.
-    
-Scheduler Wakeup Interval
-调度器唤醒是一个可选处理, 通过这个Erlang 虚拟机调度器被周期性的扫描来判定是否已经陷入睡眠, 比如是否调度器有一个空的运行列表. 这个扫描时间间隔可以通过参数erlang.schedulers.force_wakeup_interval设置, 单位为毫秒.这个参数对应于Erlang虚拟机的+sfwi选项.该参数默认设为0, 不激活调度器唤醒功能.
-Erlang在R15Bx版本里有把调度器睡眠过于频繁的倾向,如果你使用的是更新的版本,比如Riak2.0 及以后, 那多数情况下不需要启动唤醒功能.
-注: OTP的工程师曾经解释过这个功能,如果需要调度的任务不是很多,没有很多task在运行列表上的话, R15B的Erlang虚拟机会倾向于把这些task尽量集中到尽可能少的调度器上来调度, 睡眠没有调度任务的调度器, 这样可以减少调度器之间的通信花费overhead, 提高CPU的利用率. 但这个也是一个trade off, 具体还是需要用户来根据自己的实际环境来调优.  因为一旦task的数量增加比较多,或者task数量没有增加但是task本身比较耗时,那么很可能就会触发调度器的唤醒, 而唤醒调度器是比较expensive的操作, 如果频繁睡眠唤醒的话,可能会得不偿失.
 
-#####  Scheduler Compaction and Balancing
+Scheduler Wakeup Interval 调度器唤醒是一个可选处理, 通过这个Erlang 虚拟机调度器被周期性的扫描来判定是否已经陷入睡眠, 比如是否调度器有一个空的运行列表.
+这个扫描时间间隔可以通过参数erlang.schedulers.force_wakeup_interval设置, 单位为毫秒.这个参数对应于Erlang虚拟机的+sfwi选项.该参数默认设为0, 不激活调度器唤醒功能.
+Erlang在R15Bx版本里有把调度器睡眠过于频繁的倾向,如果你使用的是更新的版本,比如Riak2.0 及以后, 那多数情况下不需要启动唤醒功能. 注:
+OTP的工程师曾经解释过这个功能,如果需要调度的任务不是很多,没有很多task在运行列表上的话, R15B的Erlang虚拟机会倾向于把这些task尽量集中到尽可能少的调度器上来调度, 睡眠没有调度任务的调度器,
+这样可以减少调度器之间的通信花费overhead, 提高CPU的利用率. 但这个也是一个trade off, 具体还是需要用户来根据自己的实际环境来调优.
+因为一旦task的数量增加比较多,或者task数量没有增加但是task本身比较耗时,那么很可能就会触发调度器的唤醒, 而唤醒调度器是比较expensive的操作, 如果频繁睡眠唤醒的话,可能会得不偿失.
+
+##### Scheduler Compaction and Balancing
+
     Erlang调度器提供了两种方式来分发负载到不同的调度器上, 集中负载和utilization balancing.
     集中负载是默认打开的, 打开的时候Erlang虚拟机会尝试去尽可能多的使调度器繁忙,比如通过把任务集中到有限的几个调度器上(假设这几个有限的调度器充分运行的情况下可以调度完目前的tasks)使这几个调度器一直有工作做(not run out of work). 为了达到这个目的, 当虚拟机分配任务的时候会考虑哪些调度器应该被分配任务. 用户可以设置参数erlang.schedulers.compaction_of_load为false来关闭这个功能.
     另外一个选项, utilization balancing, 为了支持负载平衡, 默认是关闭的. 如果打开了这个选项, Erlang虚拟机则努力在不同调度器之间平衡调度器的利用. 如果不考虑每个调度器没有任务可调度的频度的话, 可以打开这个设置, erlang.schedulers.utilization_balancing 设为true(老版本里面通过设置+scl false)
     在任何时候, 只可以是使用两个功能中的一个. 如果同时设置这两个选项为false的话, Riak 会默认使用集中负载选项.如果同时设置为true, Riak会使用那个在配置文件riak.conf中最先出现的那个.(如果是旧版本的话,配置文件会是vm.args)
-    
+
 ##### Port Settings
-Riak 使用epmd, Erlang 端口映射Daemon来进行大多数的节点间的通信. 在这个系统里, 集群里的其他节点使用由nodename参数(或者是name in vm.args)来作为节点ID. 比如, riak@10.9.8.7.  在每个节点上, daemon把这些节点ID解析成一个TCP的端口. 用户可以指定一个端口范围给Riak节点来监听使用,同时也可以知道最大数量的并ports/sockets.
-Port Range
-默认情况下 , epmd绑定到TCP端口4369上并且侦听通配符接口. epmd 默认使用一个不能预测的端口作为节点间的通信, 通过绑定到端口0上， 意味着会使用第一个可用的端口. 这样就使得防火墙非常难配置.
-为了是防火墙配置简化, 用户可以指导Erlang虚拟机使用一个有限范围的端口或者单一端口. 这个最小和最大值可以设置在参数erlang.distribution.port_minimum和erlang.distribution.port_maximum里面. 比如, 下面的值被设为3000和5000.
-riak.conf
-app.config
-erlang.distribution.port_range.minimum = 3000
-erlang.distribution.port_range.maximum = 5000
-用户可以设置Erlang虚拟机使用一个单一端口, 如果只设置了最小值没有设置最大值,则表示使用单一端口. 比如, 下面设置使用单一端口5000.
-riak.conf
-app.config
-erlang.distribution.port_range.minimum = 5000
-如果最小端口没有设置, Erlang虚拟机将会在随机的高编号端口上侦听.
+
+Riak 使用epmd, Erlang 端口映射Daemon来进行大多数的节点间的通信. 在这个系统里, 集群里的其他节点使用由nodename参数(或者是name in vm.args)来作为节点ID. 比如,
+riak@10.9.8.7. 在每个节点上, daemon把这些节点ID解析成一个TCP的端口. 用户可以指定一个端口范围给Riak节点来监听使用,同时也可以知道最大数量的并ports/sockets. Port Range 默认情况下 ,
+epmd绑定到TCP端口4369上并且侦听通配符接口. epmd 默认使用一个不能预测的端口作为节点间的通信, 通过绑定到端口0上， 意味着会使用第一个可用的端口. 这样就使得防火墙非常难配置. 为了是防火墙配置简化,
+用户可以指导Erlang虚拟机使用一个有限范围的端口或者单一端口. 这个最小和最大值可以设置在参数erlang.distribution.port_minimum和erlang.distribution.port_maximum里面.
+比如, 下面的值被设为3000和5000. riak.conf app.config erlang.distribution.port_range.minimum = 3000
+erlang.distribution.port_range.maximum = 5000 用户可以设置Erlang虚拟机使用一个单一端口, 如果只设置了最小值没有设置最大值,则表示使用单一端口. 比如, 下面设置使用单一端口5000.
+riak.conf app.config erlang.distribution.port_range.minimum = 5000 如果最小端口没有设置, Erlang虚拟机将会在随机的高编号端口上侦听.
 
 ##### Maximum Ports
-用户可以通过设置参数erlang.max_ports来指定Erlang虚拟机可以使用的最大并发的 ports/sockets数量, 范围从1024到134217727. 默认值是65536. 在vm.args里面对应的参数是+Q 或者-env ERL_MAX_PORTS. 
-Asynchronous Thread Pool
-如果Erlang虚拟机支持线程可用, 用户可以为Erlang虚拟机设置异步线程池的线程数量, 使用参数erlang.async_threads(+A in vm.args). 线程数量范围从0至1024, 默认值是64,下面的例子是设置成600的情况.
-riak.conf
-vm.args
-erlang.async_threads = 600
 
+用户可以通过设置参数erlang.max_ports来指定Erlang虚拟机可以使用的最大并发的 ports/sockets数量, 范围从1024到134217727. 默认值是65536. 在vm.args里面对应的参数是+Q
+或者-env ERL_MAX_PORTS. Asynchronous Thread Pool 如果Erlang虚拟机支持线程可用, 用户可以为Erlang虚拟机设置异步线程池的线程数量, 使用参数erlang.async_threads(
++A in vm.args). 线程数量范围从0至1024, 默认值是64,下面的例子是设置成600的情况. riak.conf vm.args erlang.async_threads = 600
 
-#####  Stack Size
-除了可以指定异步线程的数量之外, 用户还可以为每个异步线程指定stack size. 参数是erlang.async_threads.stack_size, 对应到Erlang的+a参数. 用户可以在Riak中为这个参数指定size以KB, MB,GB 为单位, 有效的范围值是16至8192个字, 在32位的系统上就是64至32768字节. 该参数没有默认值, 我们建议设置为16K words, 对应为64 KB在32位系统上.  我们建议这么小一个值是考虑到异步线程数量可能会很大. 
-注:The 64 KB default is enough for drivers delivered with Erlang/OTP but might not be large enough to accommodate drivers that use the driver_async()functionality, documented here. We recommend setting higher values with caution, always keeping the number of available threads in mind.
-Kernel Polling
-如果系统支持, 用户可以在Erlang中利用内核轮询. 内核轮询可以在使用很多文件描述符的时候提高性能. 在使用中的文件描述符越多, 内核轮询发挥的作用就越大. 该选择在Riak的Erlang虚拟机中是默认打开的, 该参数对应到Erlang虚拟机中的+K参数
+##### Stack Size
 
-#####  Warning Messages
-Erlang虚拟机的error_logger 是一个事件管理器, 从Erlang运行时系统注册错误, 告警和信息事件. 默认情况下, error_logger的信息事件被映射为告警,但是用户可以设置映射成错误或者信息. 该设置为参数erlang.W, 可以设置的值为w(warning), errors 或者i(info reports).
+除了可以指定异步线程的数量之外, 用户还可以为每个异步线程指定stack size. 参数是erlang.async_threads.stack_size, 对应到Erlang的+a参数. 用户可以在Riak中为这个参数指定size以KB,
+MB,GB 为单位, 有效的范围值是16至8192个字, 在32位的系统上就是64至32768字节. 该参数没有默认值, 我们建议设置为16K words, 对应为64 KB在32位系统上.
+我们建议这么小一个值是考虑到异步线程数量可能会很大. 注:The 64 KB default is enough for drivers delivered with Erlang/OTP but might not be large
+enough to accommodate drivers that use the driver_async()functionality, documented here. We recommend setting higher
+values with caution, always keeping the number of available threads in mind. Kernel Polling 如果系统支持, 用户可以在Erlang中利用内核轮询.
+内核轮询可以在使用很多文件描述符的时候提高性能. 在使用中的文件描述符越多, 内核轮询发挥的作用就越大. 该选择在Riak的Erlang虚拟机中是默认打开的, 该参数对应到Erlang虚拟机中的+K参数
 
-#####  Process Limit
+##### Warning Messages
+
+Erlang虚拟机的error_logger 是一个事件管理器, 从Erlang运行时系统注册错误, 告警和信息事件. 默认情况下, error_logger的信息事件被映射为告警,但是用户可以设置映射成错误或者信息.
+该设置为参数erlang.W, 可以设置的值为w(warning), errors 或者i(info reports).
+
+##### Process Limit
+
 参数erlang.process_limit可以用来设置系统同时存在的最大进程数量(对应到Erlang的+P参数), 有效范围从1024至134217727. 默认值是256000.
 
-#####  Distribution Buffer
-用户可以通过参数erlang.distribution_buffer_size设置Erlang虚拟机的distribution buffer busy limit(对应到Erlang的+zdbbl参数). 修改这个参数对那些有许多busy dist port事件的节点可能会有帮助, 默认值是32MB, 最大值是2097151KB. 增大这个参数可以允许进程缓存更多的待发消息, 当缓存满的时候，发送线程被挂起直到缓存减小到设定值. 所以, 更大的缓存有助于降低延迟以及增加吞吐量,代价就是使用了更多的RAM. 用户需要根据机器的RAM资源来考虑设定这个值.
+##### Distribution Buffer
+
+用户可以通过参数erlang.distribution_buffer_size设置Erlang虚拟机的distribution buffer busy limit(对应到Erlang的+zdbbl参数). 修改这个参数对那些有许多busy
+dist port事件的节点可能会有帮助, 默认值是32MB, 最大值是2097151KB. 增大这个参数可以允许进程缓存更多的待发消息, 当缓存满的时候，发送线程被挂起直到缓存减小到设定值. 所以,
+更大的缓存有助于降低延迟以及增加吞吐量,代价就是使用了更多的RAM. 用户需要根据机器的RAM资源来考虑设定这个值.
 
 ##### Erlang Built-in Storage
-Erlang使用一个内置的数据库,ets(Erlang Term Storage)用来快速访问内存(constant access time rather than logarithmic access time). erts 表的最大数量设置在参数erlang.max_erts_tables里面, 默认值是256000,这个值要大于Erlang虚拟机自身的默认值1400(对应到vm.args 的参数e). 更大的erlang.max_erts_tables值可以提供更快的数据访问,代价是消耗更高的内存.
 
-#####  Crash Dumps
-默认情况下, Riak 的Erlang crash dumps文件是存放在位置./log/erl_crash.dump. 用户可以通过设置参数erlang.crash_dump来更改存放位置. 该参数对应到Erlang虚拟机的ERL_CRASH_DUMP环境变量.
+Erlang使用一个内置的数据库,ets(Erlang Term Storage)用来快速访问内存(constant access time rather than logarithmic access time). erts
+表的最大数量设置在参数erlang.max_erts_tables里面, 默认值是256000,这个值要大于Erlang虚拟机自身的默认值1400(对应到vm.args 的参数e).
+更大的erlang.max_erts_tables值可以提供更快的数据访问,代价是消耗更高的内存.
 
-#####  Net Kernel Tick Time
-网络内核是Erlang的一个系统进程, 提供了不同的网络监视形式. 在一个Riak集群里面, 网络内核的功能之一就是去周期性的检测节点存活. Tick time就是这个检查频度, 可以通过erlang.distribution.net_ticktime设置,单位是秒. 该参数对应到vm.args里面的参数-kernal net_ticktime.
+##### Crash Dumps
 
-#####  Shutdown Time
-用户可以设定Erlang虚拟机的关闭时间, 该设置参数为erlang.shutdown_time,默认是10秒, 一旦10秒过了, 所有存在的进程就会被杀掉. 减少关闭时间在某些情景下可能是有帮助的, 比如说在测试的时候需要频繁的启停Riak集群. 在vm.args里参数是shutdown_time, 单位是毫秒.        
-        
+默认情况下, Riak 的Erlang crash dumps文件是存放在位置./log/erl_crash.dump. 用户可以通过设置参数erlang.crash_dump来更改存放位置.
+该参数对应到Erlang虚拟机的ERL_CRASH_DUMP环境变量.
+
+##### Net Kernel Tick Time
+
+网络内核是Erlang的一个系统进程, 提供了不同的网络监视形式. 在一个Riak集群里面, 网络内核的功能之一就是去周期性的检测节点存活. Tick time就是这个检查频度,
+可以通过erlang.distribution.net_ticktime设置,单位是秒. 该参数对应到vm.args里面的参数-kernal net_ticktime.
+
+##### Shutdown Time
+
+用户可以设定Erlang虚拟机的关闭时间, 该设置参数为erlang.shutdown_time,默认是10秒, 一旦10秒过了, 所有存在的进程就会被杀掉. 减少关闭时间在某些情景下可能是有帮助的,
+比如说在测试的时候需要频繁的启停Riak集群. 在vm.args里参数是shutdown_time, 单位是毫秒.
+
 gen_tcp 编程接口
 
 #### listen(Port, Options) -> {ok, ListenSocket} | {error, Reason}
+
     Types
     Port = inet:port_number()
     Options = [listen_option()]
@@ -287,8 +292,9 @@ gen_tcp 编程接口
     {Rand, _RandSeed} = random:uniform_s(9999, erlang:now()),  
     Port = 40000 + Rand,  
     gen_tcp:listen(Port, [binary, {packet, 0}, {active, false}]).  
-    
+
 #### accept(ListenSocket) -> {ok, Socket} | {error, Reason} accept(ListenSocket, Timeout) -> {ok, Socket} | {error, Reason}
+
     Types
     ListenSocket = socket() Returned by listen/2.
     Timeout = timeout() Socket = socket() Reason = closed | timeout | system_limit | inet:posix()
@@ -327,9 +333,11 @@ gen_tcp 编程接口
         _ ->
             socket_listen_fail
     end.
-    
+
 #### connect(Address, Port, Options) -> {ok, Socket} | {error, Reason}
+
 #### connect(Address, Port, Options, Timeout) ->  {ok, Socket} | {error, Reason}
+
     Types 
     Address = inet:socket_address() |
     inet:hostname() Port = inet:port_number()
@@ -379,18 +387,20 @@ gen_tcp 编程接口
     注意：：：
         请记住，如果底层OS connect（）的调用返回超时，调用gen_tcp：连接也将返回超时（即{错误，ETIMEDOUT} ），即使较大的超时指定。
         指定要连接的选项的默认值会受到内核配置参数 inet_default_connect_options的影响。有关详细信息，请参见 inet（3）。
-    
+
 #### gen_tcp:close/1
+
     Types
      Socket = socket()
      关闭一个 TCP 套接字 
      请注意，在大多数TCP实现中，执行关闭操作并不能保证在远程端检测到关闭之前，已发送的任何数据都会传递给接收方。如果要保证将数据传递给收件人，可以通过两种常用方法来实现。
       使用gen_tcp：shutdown（Sock，write）发出信号，表明不再发送任何数据，并等待套接字的读取端关闭。
       使用套接字选项{packet，N}（或类似的选项）可以使接收器在知道已接收到所有数据时关闭连接。
-  
-    
+
 #### recv(Socket, Length) -> {ok, Packet} | {error, Reason}
+
 #### recv(Socket, Length, Timeout) -> {ok, Packet} | {error, Reason}
+
     Types
     Socket = socket()
     Length = integer() >= 0
@@ -432,6 +442,7 @@ gen_tcp 编程接口
     end.
 
 #### send(Socket, Packet) -> ok | {error, Reason}
+
     Types
         Socket = socket()
         Packet = iodata()
@@ -442,6 +453,7 @@ gen_tcp 编程接口
     在一个套接字 Socket 发送一个数据包。
 
 #### shutdown(Socket, How) -> ok | {error, Reason}
+
     Types
         Socket = socket()
         How = read | write | read_write
@@ -457,9 +469,9 @@ gen_tcp 编程接口
     如果遇到任何错误，则关闭套接字，并在下一个recv / 2或 send / 2上返回 {error，closed}。
     
     如果对等方在写端执行了关闭操作，则选项{exit_on_close，false}很有用。
-   
 
 #### gen_tcp:controlling_process/2
+
     改变一个套接字的控制进程
     
     将新的控制过程Pid分配给 Socket。控制过程是从套接字接收消息的过程。
@@ -470,8 +482,9 @@ gen_tcp 编程接口
     如果套接字设置为活动模式，则此功能会将呼叫者邮箱中的所有消息传送到新的控制进程。
     如果在传输过程中有任何其他进程正在与套接字交互，则传输可能无法正常进行，并且消息可能会保留在呼叫者的邮箱中。
     例如，在传输完成之前更改套接字活动模式可能会导致此情况  
-    
+
 #### 套接字选项
+
     {active, true | false | once | -32768..32767} |
         如果值为true，这是默认值，则将从套接字接收的所有内容作为消息发送到接收进程。
         如果值为false（被动模式），则该进程必须通过调用gen_tcp：recv / 2,3， gen_udp：recv / 2,3或gen_sctp：recv / 1,2来显式接收传入的数据 （取决于套接字的类型） ）。
@@ -627,38 +640,18 @@ gen_tcp 编程接口
     {recvtos, boolean()} |
     {recvtclass, boolean()} |
     {recvttl, boolean()} |
-    
- option_name() =
-    active | buffer | delay_send | deliver | dontroute |
-    exit_on_close | header | high_msgq_watermark |
-    high_watermark | keepalive | linger | low_msgq_watermark |
-    low_watermark | mode | nodelay | packet | packet_size |
-    pktoptions | priority |
-    {raw,Protocol :: integer() >= 0, OptionNum :: integer() >= 0, ValueSpec ::(ValueSize :: integer() >= 0) | (ValueBin :: binary())} |
-    recbuf | reuseaddr | send_timeout | send_timeout_close |
-    show_econnreset | sndbuf | tos | tclass | ttl | recvtos |
-    recvtclass | recvttl | pktoptions | ipv6_v6only     
-    
- connect_option() =
-    {ip, inet:socket_address()} |
-    {fd, Fd :: integer() >= 0} |
-    {ifaddr, inet:socket_address()} |
-    inet:address_family() |
-    {port, inet:port_number()} |
-    {tcp_module, module()} |
-    {netns, file:filename_all()} |
-    {bind_to_device, binary()} |
-    option()
- listen_option() =
-    {ip, inet:socket_address()} |
-    {fd, Fd :: integer() >= 0} |
-    {ifaddr, inet:socket_address()} |
-    inet:address_family() |
-    {port, inet:port_number()} |
-    {backlog, B :: integer() >= 0} |
-    {tcp_module, module()} |
-    {netns, file:filename_all()} |
-    {bind_to_device, binary()} |
-    option()
- socket()
- As returned by accept/1,2 and connect/3,4.         
+
+option_name() = active | buffer | delay_send | deliver | dontroute | exit_on_close | header | high_msgq_watermark |
+high_watermark | keepalive | linger | low_msgq_watermark | low_watermark | mode | nodelay | packet | packet_size |
+pktoptions | priority | {raw,Protocol :: integer() >= 0, OptionNum :: integer() >= 0, ValueSpec ::(ValueSize ::
+integer() >= 0) | (ValueBin :: binary())} | recbuf | reuseaddr | send_timeout | send_timeout_close | show_econnreset |
+sndbuf | tos | tclass | ttl | recvtos | recvtclass | recvttl | pktoptions | ipv6_v6only
+
+connect_option() = {ip, inet:socket_address()} | {fd, Fd :: integer() >= 0} | {ifaddr, inet:socket_address()} | inet:
+address_family() | {port, inet:port_number()} | {tcp_module, module()} | {netns, file:filename_all()} | {bind_to_device,
+binary()} | option()
+listen_option() = {ip, inet:socket_address()} | {fd, Fd :: integer() >= 0} | {ifaddr, inet:socket_address()} | inet:
+address_family() | {port, inet:port_number()} | {backlog, B :: integer() >= 0} | {tcp_module, module()} | {netns, file:
+filename_all()} | {bind_to_device, binary()} | option()
+socket()
+As returned by accept/1,2 and connect/3,4.         

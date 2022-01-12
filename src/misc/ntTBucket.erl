@@ -13,7 +13,7 @@
 %%       这两种算法的主要区别在于“漏桶算法”能够强行限制数据的传输速率，
 %%       而“令牌桶算法”在能够限制数据的平均传输数据外，还允许某种程度的突发传输。
 %%       在“令牌桶算法”中，只要令牌桶中存在令牌，那么就允许突发地传输数据直到达到用户配置的门限，因此它适合于具有突发特性的流量。
--module(nlTokenBucket).
+-module(ntTBucket).
 -include("eNet.hrl").
 
 -export([
@@ -23,7 +23,7 @@
    , check/3
 ]).
 
--type(tokenBucket() :: #tokenBucket{}).
+-type(tokenBucket() :: #tBucket{}).
 -type(tbConfig() :: {pos_integer(), pos_integer()}).
 
 -spec(new(tbConfig()) -> tokenBucket()).
@@ -32,7 +32,7 @@ new({Rate, BucketSize}) ->
 
 -spec(new(pos_integer(), pos_integer()) -> tokenBucket()).
 new(Rate, BucketSize) when is_integer(BucketSize), 0 < Rate andalso Rate =< BucketSize ->
-   #tokenBucket{
+   #tBucket{
       rate = Rate
       , tokens = BucketSize
       , lastTime = erlang:system_time(milli_seconds)
@@ -44,15 +44,15 @@ check(Consume, TokenBucket) ->
    check(Consume, erlang:system_time(milli_seconds), TokenBucket).
 
 -spec(check(pos_integer(), integer(), tokenBucket()) -> {non_neg_integer(), tokenBucket()}).
-check(Consume, Now, #tokenBucket{rate = Rate, tokens = Tokens, lastTime = LastTime, bucketSize = BucketSize} = TokenBucket) ->
+check(Consume, Now, #tBucket{rate = Rate, tokens = Tokens, lastTime = LastTime, bucketSize = BucketSize} = TokenBucket) ->
    AvailableToken = erlang:min(BucketSize, Tokens + (Rate * (Now - LastTime)) div 1000),
    case AvailableToken >= Consume of
-      true  ->
+      true ->
          %% Tokens available
-         {0, TokenBucket#tokenBucket{tokens = AvailableToken - Consume, lastTime = Now}};
+         {0, TokenBucket#tBucket{tokens = AvailableToken - Consume, lastTime = Now}};
       false ->
          %% Tokens not enough
          %% 计算需要等待的时间 单位毫秒
          WaitTime = (Consume - AvailableToken) * 1000 div Rate,
-         {WaitTime, TokenBucket#tokenBucket{tokens = 0, lastTime = Now}}
+         {WaitTime, TokenBucket#tBucket{tokens = 0, lastTime = Now}}
    end.

@@ -1,4 +1,4 @@
--module(nlCidr).
+-module(ntCidr).
 
 -export([
    parse/1
@@ -10,7 +10,7 @@
    , is_ipv6/1
 ]).
 
--export_type([ cidr_string/0
+-export_type([cidr_string/0
    , cidr/0
 ]).
 
@@ -25,7 +25,7 @@ parse(S) ->
 -spec(parse(string(), boolean()) -> cidr()).
 parse(S, Adjust) ->
    case string:tokens(S, "/") of
-      [AddrStr]         -> parse_addr(AddrStr);
+      [AddrStr] -> parse_addr(AddrStr);
       [AddrStr, LenStr] -> parse_cidr(AddrStr, LenStr, Adjust)
    end.
 
@@ -106,21 +106,21 @@ end_mask({_, _, _, _}, Len) when 0 =< Len, Len =< 32 ->
       Len == 32 -> {0, 0, 0, 0};
       Len >= 24 -> {0, 0, 0, bmask(Len, 8)};
       Len >= 16 -> {0, 0, bmask(Len, 8), 16#FF};
-      Len >= 8  -> {0, bmask(Len, 8), 16#FF, 16#FF};
-      Len >= 0  -> {bmask(Len, 8), 16#FF, 16#FF, 16#FF}
+      Len >= 8 -> {0, bmask(Len, 8), 16#FF, 16#FF};
+      Len >= 0 -> {bmask(Len, 8), 16#FF, 16#FF, 16#FF}
    end;
 
 end_mask({_, _, _, _, _, _, _, _}, Len) when 0 =< Len, Len =< 128 ->
    if
       Len == 128 -> {0, 0, 0, 0, 0, 0, 0, 0};
       Len >= 112 -> {0, 0, 0, 0, 0, 0, 0, bmask(Len, 16)};
-      Len >= 96  -> {0, 0, 0, 0, 0, 0, bmask(Len, 16), 16#FFFF};
-      Len >= 80  -> {0, 0, 0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF};
-      Len >= 64  -> {0, 0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF};
-      Len >= 49  -> {0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
-      Len >= 32  -> {0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
-      Len >= 16  -> {0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
-      Len >= 0   -> {bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF}
+      Len >= 96 -> {0, 0, 0, 0, 0, 0, bmask(Len, 16), 16#FFFF};
+      Len >= 80 -> {0, 0, 0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF};
+      Len >= 64 -> {0, 0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF};
+      Len >= 49 -> {0, 0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
+      Len >= 32 -> {0, 0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
+      Len >= 16 -> {0, bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF};
+      Len >= 0 -> {bmask(Len, 16), 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF, 16#FFFF}
    end.
 
 bmask(I, 8) when 0 =< I, I =< 32 ->

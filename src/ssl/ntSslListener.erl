@@ -1,7 +1,7 @@
--module(nlTcpListener).
--include("eNet.hrl").
+-module(ntSslListener).
 
-%% 该文件不可热更新
+-include("eNet.hrl").
+-include("ntCom.hrl").
 
 -compile(inline).
 -compile({inline_size, 128}).
@@ -18,15 +18,16 @@
    , system_terminate/4
 ]).
 
--spec(start_link(atom(), listenOn(), module(), [listenOpt()]) -> {ok, pid()} | ignore | {error, term()}).
-start_link(ListenName, ListenOn, ConMod, ListenOpt) ->
-   proc_lib:start_link(?MODULE, init_it, [ListenName, self(), {ListenOn, ConMod, ListenOpt}], infinity, []).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genActor  start %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(start_link(atom(), atom(), inet:port_number(), [listenOpt()]) -> {ok, pid()} | ignore | {error, term()}).
+start_link(ListenName, AptSupName, Port, ListenOpts) ->
+   proc_lib:start_link(?MODULE, init_it, [ListenName, self(), {AptSupName, Port, ListenOpts}], infinity, []).
 
 init_it(Name, Parent, Args) ->
    case safeRegister(Name) of
       true ->
          process_flag(trap_exit, true),
-         moduleInit(Parent, Args);
+         modInit(Parent, Args);
       {false, Pid} ->
          proc_lib:init_ack(Parent, {error, {already_started, Pid}})
    end.
@@ -54,7 +55,7 @@ safeRegister(Name) ->
       _:_ -> {false, whereis(Name)}
    end.
 
-moduleInit(Parent, Args) ->
+modInit(Parent, Args) ->
    case init(Args) of
       {ok, State} ->
          proc_lib:init_ack(Parent, {ok, self()}),
@@ -79,7 +80,7 @@ loop(Parent, State) ->
                exit(Reason)
          end
    end.
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genActor  end %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -record(state, {
    listenAddr :: inet:ip_address()
@@ -88,24 +89,23 @@ loop(Parent, State) ->
    , opts :: [listenOpt()]
 }).
 
--define(ACCEPTOR_POOL, 16).
--define(DEFAULT_TCP_OPTIONS, [{nodelay, true}, {reuseaddr, true}, {send_timeout, 30000}, {send_timeout_close, true}]).
+-define(DefTcpOpts, [{nodelay, true}, {reuseaddr, true}, {send_timeout, 30000}, {send_timeout_close, true}]).
 
-init({ListenOn, ConMod, ListenOpt}) ->
+init({AptSupName, Port, ListenOpts}) ->
    process_flag(trap_exit, true),
-   Port = nlNetCom:getPort(ListenOn),
-   SockOpts = ?getListValue(tcpOpts, ListenOpt, []),
-   LastSockOpts = nlNetCom:mergeOpts(?DEFAULT_TCP_OPTIONS, SockOpts),
+   TcpOpts = ?getLValue(tcpOpts, ListenOpts, []),
+   LastTcpOpts = ntCom:mergeOpts(?DefTcpOpts, TcpOpts),
    %% Don't active the socket...
-   case gen_tcp:listen(Port, [{active, false} | lists:keydelete(active, 1, LastSockOpts)]) of
+   case gen_tcp:listen(Port, lists:keystore(active, 1, LastTcpOpts, {active, false})) of
       {ok, LSock} ->
-         AcceptorNum = ?getListValue(acceptors, ListenOpt, ?ACCEPTOR_POOL),
-         startAcceptor(AcceptorNum, LSock, ConMod),
+         AptCnt = ?getLValue(aptCnt, ListenOpts, ?AptCnt),
+         ConMod = ?getLValue(conMod, ListenOpts, undefined),
+         startAcceptor(AptCnt, LSock, AptSupName, ConMod),
          {ok, {LAddr, LPort}} = inet:sockname(LSock),
-         ?WARN(nlTcpListener, " success to listen on ~p ~n", [Port]),
-         {ok, #state{listenAddr = LAddr, listenPort = LPort, lSock = LSock, opts = [{acceptors, AcceptorNum}, {tcpOpts, LastSockOpts}]}};
+         % ?ntInfo("success to listen on ~p ~n", [Port]),
+         {ok, #state{listenAddr = LAddr, listenPort = LPort, lSock = LSock, opts = [{acceptors, AptCnt}, {tcpOpts, LastTcpOpts}]}};
       {error, Reason} ->
-         ?WARN(nlTcpListener, " failed to listen on ~p - ~p (~s) ~n", [Port, Reason, inet:format_error(Reason)]),
+         ?ntErr("failed to listen on ~p - ~p (~s) ~n", [Port, Reason, inet:format_error(Reason)]),
          {stop, Reason}
    end.
 
@@ -118,20 +118,20 @@ handleMsg({'$gen_call', From, miListenPort}, #state{listenPort = LPort} = State)
    {ok, State};
 
 handleMsg(_Msg, State) ->
-   ?WARN(nlTcpListener, "[~s] unexpected info: ~p ~n", [?MODULE, _Msg]),
+   ?ntErr("~p unexpected info: ~p ~n", [?MODULE, _Msg]),
    {noreply, State}.
 
 terminate(_Reason, #state{lSock = LSock, listenAddr = Addr, listenPort = Port}) ->
-   ?WARN(nlTcpListener, "stopped on ~s:~p ~n", [inet:ntoa(Addr),Port]),
+   ?ntInfo("stopped on ~s:~p ~n", [inet:ntoa(Addr), Port]),
    %% 关闭这个监听LSock  监听进程收到tcp_close 然后终止acctptor进程
    catch port_close(LSock),
    ok.
 
-startAcceptor(0, _LSock, _ConMod) ->
+startAcceptor(0, _LSock, _AptSupName, _ConMod) ->
    ok;
-startAcceptor(N, LSock, ConMod) ->
-   nlTcpAcceptorSup:startChild([LSock, ConMod, []]),
-   startAcceptor(N - 1, LSock, ConMod).
+startAcceptor(N, LSock, AptSupName, ConMod) ->
+   supervisor:start_child(AptSupName, [LSock, ConMod, []]),
+   startAcceptor(N - 1, LSock, AptSupName, ConMod).
 
 -spec getOpts(pid()) -> [listenOpt()].
 getOpts(Listener) ->

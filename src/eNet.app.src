@@ -1,12 +1,12 @@
 {application, eNet,
- [{description, "An OTP application"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, {eNet_app, []}},
-  {applications,
-   [kernel, stdlib]},
-  {env,[]},
-  {modules, []},
-  {licenses, ["Apache 2.0"]},
-  {links, []}
- ]}.
+   [{description, "An OTP application"},
+      {vsn, "0.1.0"},
+      {registered, []},
+      {mod, {eNet_app, []}},
+      {applications, [kernel, stdlib, sasl, ssl, eSync]},
+      {env, []},
+      {modules, []},
+
+      {licenses, ["MIT"]},
+      {links, []}
+   ]}.

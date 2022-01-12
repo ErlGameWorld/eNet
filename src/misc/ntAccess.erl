@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(nlAccess).
+-module(ntAccess).
 
 -type(rule() :: {allow, all} | {allow, string()}
 | {deny, all} | {deny, string()}).
