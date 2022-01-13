@@ -92,7 +92,6 @@ loop(Parent, State) ->
 -define(DefTcpOpts, [{nodelay, true}, {reuseaddr, true}, {send_timeout, 30000}, {send_timeout_close, true}]).
 
 init({AptSupName, Port, ListenOpts}) ->
-   process_flag(trap_exit, true),
    TcpOpts = ?getLValue(tcpOpts, ListenOpts, []),
    LastTcpOpts = ntCom:mergeOpts(?DefTcpOpts, TcpOpts),
    %% Don't active the socket...

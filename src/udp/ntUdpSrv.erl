@@ -95,8 +95,6 @@ loop(Parent, State) ->
 -define(DefUdpOpts, [binary, {reuseaddr, true}]).
 
 init({Port, UoOpts}) ->
-   process_flag(trap_exit, true),
-
    UdpOpts = ?getLValue(udpOpts, UoOpts, []),
    LastUdpOpts = ntCom:mergeOpts(?DefUdpOpts, UdpOpts),
    %% Don't active the socket...
