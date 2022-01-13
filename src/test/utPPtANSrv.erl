@@ -1,4 +1,4 @@
--module(utSslANSrv).             %% ssl active N server
+-module(utPPtANSrv).             %% ssl active N server
 
 -behaviour(gen_server).
 
@@ -27,8 +27,8 @@ start(Name, Port) ->
       {certfile, filename:join(PrivDir, "demo.crt")},
       {keyfile, filename:join(PrivDir, "demo.key")}
    ],
-   Opts = [{tcpOpts, TcpOpts}, {sslOpts, SslOpts}, {conMod, ?MODULE}],
-   eNet:openSsl(Name, Port, Opts).
+   Opts = [{tcpOpts, TcpOpts}, {sslOpts, SslOpts}, {conMod, ?MODULE}, {proxyPt, true}, {proxyPtTet, 1111111}],
+   eNet:openPpt(Name, Port, Opts).
 
 start_link(Sock) ->
    {ok, proc_lib:spawn_link(?MODULE, init, [Sock])}.
@@ -62,8 +62,8 @@ handle_info({ssl_closed, _Socket}, State) ->
 handle_info({ssl_passive, SslSock}, State) ->
    ssl:setopts(SslSock, [{active, 100}]),
    {noreply, State};
-handle_info({?mSockReady, Sock, SslOpts, HandshakeTimeout}, State) ->
-   case ntSslAcceptor:handshake(Sock, SslOpts, HandshakeTimeout) of
+handle_info({?mSockReady, Sock, SslOpts, SslHSTet, ProxyPt, ProxyPtTet}, State) ->
+   case ntPptAcceptor:pptAndHS(Sock, SslOpts, SslHSTet, ProxyPt, ProxyPtTet) of
       {ok, SslSock} ->
          ssl:setopts(SslSock, [{active, 100}]),
          {noreply, State#state{socket = SslSock}};

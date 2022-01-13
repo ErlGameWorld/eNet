@@ -35,6 +35,5 @@ loop(Num, Sock, Host, Port) ->
    end.
 
 send(N, Sock, Host, Port) ->
-   io:format("fdsfsfs ~n"),
    gen_udp:send(Sock, Host, Port, [integer_to_list(N), ":", <<"Hello, eSockd!">>]).
 

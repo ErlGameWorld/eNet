@@ -37,7 +37,7 @@ openTcp(ListenName, Port, ListenOpts) ->
 openSsl(ListenName, Port, ListenOpts) ->
    SslMgrSupSpec = #{
       id => ListenName,
-      start => {ntSslMgrSup, start_link, [Port, ListenOpts]},
+      start => {ntSslMgrSup, start_link, [ListenName, Port, ListenOpts]},
       restart => permanent,
       shutdown => infinity,
       type => supervisor,
@@ -63,7 +63,7 @@ openUdp(UdpName, Port, ListenOpts) ->
 openPpt(ListenName, Port, ListenOpts) ->
    SslMgrSupSpec = #{
       id => ListenName,
-      start => {ntPptMgrSup, start_link, [Port, ListenOpts]},
+      start => {ntPptMgrSup, start_link, [ListenName, Port, ListenOpts]},
       restart => permanent,
       shutdown => infinity,
       type => supervisor,

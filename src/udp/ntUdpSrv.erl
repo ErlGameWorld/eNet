@@ -113,13 +113,13 @@ init({Port, UoOpts}) ->
          {stop, Reason}
    end.
 
-handleMsg({udp, Sock, IP, InPortNo, Packet}, #state{oSock = Sock, conMod = ConMod, peers = Peers} = State) ->
+handleMsg({udp, Sock, IP, InPortNo, AncData, Packet}, #state{oSock = Sock, conMod = ConMod, peers = Peers} = State) ->
    case maps:find({IP, InPortNo}, Peers) of
       {ok, Pid} ->
          Pid ! {datagram, self(), Packet},
          {noreply, State};
       error ->
-         try ConMod:datagram(Sock, IP, InPortNo, Packet) of
+         try ConMod:datagram(Sock, IP, InPortNo, AncData, Packet) of
             {ok, Pid} ->
                _Ref = erlang:monitor(process, Pid),
                Pid ! {datagram, self(), Packet},
@@ -133,9 +133,29 @@ handleMsg({udp, Sock, IP, InPortNo, Packet}, #state{oSock = Sock, conMod = ConMo
                {noreply, State}
          end
    end;
+handleMsg({udp, Sock, IP, InPortNo, Packet}, #state{oSock = Sock, conMod = ConMod, peers = Peers} = State) ->
+   case maps:find({IP, InPortNo}, Peers) of
+      {ok, Pid} ->
+         Pid ! {datagram, self(), Packet},
+         {ok, State};
+      error ->
+         try ConMod:datagram(Sock, IP, InPortNo, undefined, Packet) of
+            {ok, Pid} ->
+               _Ref = erlang:monitor(process, Pid),
+               Pid ! {datagram, self(), Packet},
+               {ok, addPeer({IP, InPortNo}, Pid, State)};
+            {error, Reason} ->
+               ?ntErr("Failed to start udp channel for peer ~p ~p reason: ~p", [IP, InPortNo, Reason]),
+               {ok, State}
+         catch
+            C:R:S ->
+               ?ntErr("Exception occurred when starting udp channel for peer ~p ~p, reason: ~p", [IP, InPortNo, {C, R, S}]),
+               {ok, State}
+         end
+   end;
 handleMsg({udp_passive, Sock}, #state{oSock = Sock} = State) ->
    inet:setopts(Sock, [{active, 100}]),
-   {noreply, State, hibernate};
+   {ok, State};
 
 handleMsg({'DOWN', _MRef, process, DownPid, _Reason}, State = #state{peers = Peers}) ->
    peerDown(DownPid, Peers, State);
@@ -153,7 +173,7 @@ handleMsg({'$gen_call', From, miOpenPort}, #state{listenPort = LPort} = State) -
 
 handleMsg(_Msg, State) ->
    ?ntErr("~p unexpected info: ~p ~n", [?MODULE, _Msg]),
-   {noreply, State}.
+   {ok, State}.
 
 terminate(_Reason, #state{oSock = LSock, listenAddr = Addr, listenPort = Port}) ->
    ?ntInfo("stopped on ~s:~p ~n", [inet:ntoa(Addr), Port]),
@@ -177,7 +197,7 @@ delPeer(Peer, Pid, State = #state{peers = Peers}) ->
 peerDown(DownPid, Peers, State) ->
    case maps:find(DownPid, Peers) of
       {ok, Peer} ->
-         {noreply, delPeer(Peer, DownPid, State)};
+         {ok, delPeer(Peer, DownPid, State)};
       error ->
-         {noreply, State}
+         {ok, State}
    end.

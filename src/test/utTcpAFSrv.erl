@@ -1,6 +1,8 @@
 -module(utTcpAFSrv).             %% tcp active false server
 -behaviour(gen_server).
 
+-include("eNet.hrl").
+
 %% start
 -export([newConn/1]).
 
@@ -23,7 +25,7 @@ start(Name, Port) ->
    eNet:openTcp(Name, Port, Opts).
 
 start_link(Sock) ->
-   {ok, proc_lib:spawn_link(?MODULE, init, Sock)}.
+   {ok, proc_lib:spawn_link(?MODULE, init, [Sock])}.
 
 newConn(Sock) ->
    start_link(Sock).
@@ -58,7 +60,7 @@ handle_info({inet_reply, _Sock, {error, Reason}}, State) ->
    io:format("Shutdown for ~p~n", [Reason]),
    shutdown(Reason, State);
 
-handle_info({miSockReady, Sock}, State) ->
+handle_info({?mSockReady, Sock}, State) ->
    prim_inet:async_recv(Sock, 0, -1),
    io:format("get miSockReady for______ ~p~n", [Sock]),
    {noreply, State};
