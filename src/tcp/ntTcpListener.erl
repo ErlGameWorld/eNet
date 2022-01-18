@@ -99,7 +99,8 @@ init({AptSupName, Port, ListenOpts}) ->
       {ok, LSock} ->
          AptCnt = ?getLValue(aptCnt, ListenOpts, ?AptCnt),
          ConMod = ?getLValue(conMod, ListenOpts, undefined),
-         startAcceptor(AptCnt, LSock, AptSupName, ConMod),
+         ConArgs = ?getLValue(conArgs, ListenOpts, undefined),
+         startAcceptor(AptCnt, LSock, AptSupName, ConMod, ConArgs),
          {ok, {LAddr, LPort}} = inet:sockname(LSock),
          % ?ntInfo("success to listen on ~p ~n", [Port]),
          {ok, #state{listenAddr = LAddr, listenPort = LPort, lSock = LSock, opts = [{acceptors, AptCnt}, {tcpOpts, LastTcpOpts}]}};
@@ -126,11 +127,11 @@ terminate(_Reason, #state{lSock = LSock, listenAddr = Addr, listenPort = Port}) 
    catch port_close(LSock),
    ok.
 
-startAcceptor(0, _LSock, _AptSupName, _ConMod) ->
+startAcceptor(0, _LSock, _AptSupName, _ConMod, _ConArgs) ->
    ok;
-startAcceptor(N, LSock, AptSupName, ConMod) ->
-   supervisor:start_child(AptSupName, [LSock, ConMod, []]),
-   startAcceptor(N - 1, LSock, AptSupName, ConMod).
+startAcceptor(N, LSock, AptSupName, ConMod, ConArgs) ->
+   supervisor:start_child(AptSupName, [LSock, ConMod, ConArgs, []]),
+   startAcceptor(N - 1, LSock, AptSupName, ConMod, ConArgs).
 
 -spec getOpts(pid()) -> [listenOpt()].
 getOpts(Listener) ->

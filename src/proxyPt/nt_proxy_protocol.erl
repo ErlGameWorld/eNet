@@ -17,7 +17,7 @@
 %% @doc [Proxy Protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
 -module(nt_proxy_protocol).
 
--include("proxyPt.hrl").
+-include("ntProxyPt.hrl").
 
 -export([recv/2]).
 

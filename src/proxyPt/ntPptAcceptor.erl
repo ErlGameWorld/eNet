@@ -2,13 +2,13 @@
 
 -include("eNet.hrl").
 -include("ntCom.hrl").
--include("proxyPt.hrl").
+-include("ntProxyPt.hrl").
 
 -compile(inline).
 -compile({inline_size, 128}).
 
 -export([
-   start_link/7
+   start_link/8
 
    , pptAndHS/5
 
@@ -23,9 +23,9 @@
 ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genActor  start %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec start_link(list(), timeout(), boolean(), timeout(), inet:socket(), module(), [proc_lib:spawn_option()]) -> {ok, pid()}.
-start_link(SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod, SpawnOpts) ->
-   proc_lib:start_link(?MODULE, init_it, [self(), {SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod}], infinity, SpawnOpts).
+-spec start_link(list(), timeout(), boolean(), timeout(), inet:socket(), module(), term(), [proc_lib:spawn_option()]) -> {ok, pid()}.
+start_link(SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod, ConArgs, SpawnOpts) ->
+   proc_lib:start_link(?MODULE, init_it, [self(), {SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod, ConArgs}], infinity, SpawnOpts).
 
 init_it(Parent, Args) ->
    process_flag(trap_exit, true),
@@ -81,26 +81,27 @@ loop(Parent, State) ->
    , proxyPtTet
    , ref
    , conMod
+   , conArgs
    , sockMod
 }).
 
 -spec init(Args :: term()) -> ok.
-init({SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod}) ->
+init({SslOpts, SslHSTet, ProxyPt, ProxyPtTet, LSock, ConMod, ConArgs}) ->
    case prim_inet:async_accept(LSock, -1) of
       {ok, Ref} ->
          {ok, SockMod} = inet_db:lookup_socket(LSock),
-         {ok, #state{lSock = LSock, sslOpts = SslOpts, sslHSTet = SslHSTet, proxyPt = ProxyPt, proxyPtTet = ProxyPtTet, ref = Ref, conMod = ConMod, sockMod = SockMod}};
+         {ok, #state{lSock = LSock, sslOpts = SslOpts, sslHSTet = SslHSTet, proxyPt = ProxyPt, proxyPtTet = ProxyPtTet, ref = Ref, conMod = ConMod, conArgs = ConArgs, sockMod = SockMod}};
       {error, Reason} ->
          ?ntErr("init prim_inet:async_accept error ~p~n", [Reason]),
          {stop, Reason}
    end.
 
-handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, sslOpts = SslOpts, sslHSTet = SslHSTet, proxyPt = ProxyPt, proxyPtTet = ProxyPtTet, ref = Ref, conMod = ConMod, sockMod = SockMod} = State) ->
+handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, sslOpts = SslOpts, sslHSTet = SslHSTet, proxyPt = ProxyPt, proxyPtTet = ProxyPtTet, ref = Ref, conMod = ConMod, conArgs = ConArgs, sockMod = SockMod} = State) ->
    case Msg of
       {ok, Sock} ->
          %% make it look like gen_tcp:accept
          inet_db:register_socket(Sock, SockMod),
-         try ConMod:newConn(Sock) of
+         try ConMod:newConn(Sock, ConArgs) of
             {ok, Pid} ->
                gen_tcp:controlling_process(Sock, Pid),
                Pid ! {?mSockReady, Sock, SslOpts, SslHSTet, ProxyPt, ProxyPtTet},
