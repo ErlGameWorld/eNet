@@ -3,7 +3,7 @@
       {vsn, "0.1.0"},
       {registered, []},
       {mod, {eNet_app, []}},
-      {applications, [kernel, stdlib, sasl, ssl, eSync]},
+      {applications, [kernel, stdlib, sasl, ssl]},
       {env, []},
       {modules, []},
 

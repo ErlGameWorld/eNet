@@ -43,8 +43,8 @@ system_get_state(State) ->
    {ok, State}.
 
 -spec system_terminate(term(), pid(), [], term()) -> none().
-system_terminate(Reason, _Parent, _Debug, _State) ->
-   exit(Reason).
+system_terminate(Reason, _Parent, _Debug, State) ->
+   terminate(Reason, State).
 
 modInit(Parent, Args) ->
    case init(Args) of
@@ -61,13 +61,15 @@ loop(Parent, State) ->
       {system, From, Request} ->
          sys:handle_system_msg(Request, From, Parent, ?MODULE, [], {Parent, State});
       {'EXIT', Parent, Reason} ->
-         exit(Reason);
+         terminate(Reason, State);
       Msg ->
          case handleMsg(Msg, State) of
+            kpS ->
+               loop(Parent, State);
             {ok, NewState} ->
                loop(Parent, NewState);
             {stop, Reason} ->
-               exit(Reason)
+               terminate(Reason, State)
          end
    end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% genActor  end %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -112,7 +114,7 @@ handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, sslOpts = SslOpts
                {stop, error_ret}
          catch
             E:R:S ->
-               ?ntErr("CliMod:newConnect crash: ~p:~p~n~p~n ~n ", [E, R, S]),
+               ?ntErr("ConMod:newConn crash: ~p:~p~n~p~n ~n ", [E, R, S]),
                newAsyncAccept(LSock, State)
          end;
       {error, closed} ->
@@ -122,9 +124,11 @@ handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, sslOpts = SslOpts
          ?ntErr("listen sock error ~p~n", [Reason]),
          {stop, {lsock, Reason}}
    end;
-handleMsg(_Msg, State) ->
-   ?ntErr("~p receive unexpected ~p  msg: ~p", [?MODULE, self(), _Msg]),
-   {ok, State}.
+handleMsg(_Msg, _State) ->
+   kpS.
+
+terminate(Reason, _State) ->
+   exit(Reason).
 
 newAsyncAccept(LSock, State) ->
    case prim_inet:async_accept(LSock, -1) of

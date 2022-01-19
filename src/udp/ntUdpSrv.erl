@@ -45,8 +45,8 @@ system_get_state(State) ->
    {ok, State}.
 
 -spec system_terminate(term(), pid(), [], term()) -> none().
-system_terminate(Reason, _Parent, _Debug, _State) ->
-   exit(Reason).
+system_terminate(Reason, _Parent, _Debug, State) ->
+   terminate(Reason, State).
 
 safeRegister(Name) ->
    try register(Name, self()) of
@@ -73,11 +73,12 @@ loop(Parent, State) ->
          terminate(Reason, State);
       Msg ->
          case handleMsg(Msg, State) of
+            kpS ->
+               loop(Parent, State);
             {ok, NewState} ->
                loop(Parent, NewState);
             {stop, Reason} ->
-               terminate(Reason, State),
-               exit(Reason)
+               terminate(Reason, State)
          end
    end.
 
@@ -115,7 +116,7 @@ handleMsg({udp, Sock, IP, InPortNo, AncData, Packet}, #state{oSock = Sock, conMo
    case maps:find({IP, InPortNo}, Peers) of
       {ok, Pid} ->
          Pid ! {datagram, self(), Packet},
-         {noreply, State};
+         kpS;
       error ->
          try ConMod:datagram(Sock, IP, InPortNo, AncData, Packet) of
             {ok, Pid} ->
@@ -124,18 +125,18 @@ handleMsg({udp, Sock, IP, InPortNo, AncData, Packet}, #state{oSock = Sock, conMo
                {noreply, addPeer({IP, InPortNo}, Pid, State)};
             {error, Reason} ->
                ?ntErr("Failed to start udp channel for peer ~p ~p reason: ~p", [IP, InPortNo, Reason]),
-               {noreply, State}
+               kpS
          catch
             C:R:S ->
                ?ntErr("Exception occurred when starting udp channel for peer ~p ~p, reason: ~p", [IP, InPortNo, {C, R, S}]),
-               {noreply, State}
+               kpS
          end
    end;
 handleMsg({udp, Sock, IP, InPortNo, Packet}, #state{oSock = Sock, conMod = ConMod, peers = Peers} = State) ->
    case maps:find({IP, InPortNo}, Peers) of
       {ok, Pid} ->
          Pid ! {datagram, self(), Packet},
-         {ok, State};
+         kpS;
       error ->
          try ConMod:datagram(Sock, IP, InPortNo, undefined, Packet) of
             {ok, Pid} ->
@@ -144,16 +145,16 @@ handleMsg({udp, Sock, IP, InPortNo, Packet}, #state{oSock = Sock, conMod = ConMo
                {ok, addPeer({IP, InPortNo}, Pid, State)};
             {error, Reason} ->
                ?ntErr("Failed to start udp channel for peer ~p ~p reason: ~p", [IP, InPortNo, Reason]),
-               {ok, State}
+               kpS
          catch
             C:R:S ->
                ?ntErr("Exception occurred when starting udp channel for peer ~p ~p, reason: ~p", [IP, InPortNo, {C, R, S}]),
-               {ok, State}
+               kpS
          end
    end;
-handleMsg({udp_passive, Sock}, #state{oSock = Sock} = State) ->
+handleMsg({udp_passive, Sock}, #state{oSock = Sock} = _State) ->
    inet:setopts(Sock, [{active, 100}]),
-   {ok, State};
+   kpS;
 
 handleMsg({'DOWN', _MRef, process, DownPid, _Reason}, State = #state{peers = Peers}) ->
    peerDown(DownPid, Peers, State);
@@ -161,22 +162,22 @@ handleMsg({'DOWN', _MRef, process, DownPid, _Reason}, State = #state{peers = Pee
 handleMsg({'EXIT', DownPid, _Reason}, State = #state{peers = Peers}) ->
    peerDown(DownPid, Peers, State);
 
-handleMsg({'$gen_call', From, miOpts}, #state{opts = Opts} = State) ->
+handleMsg({'$gen_call', From, miOpts}, #state{opts = Opts} = _State) ->
    gen_server:reply(From, Opts),
-   {ok, State};
+   kpS;
 
-handleMsg({'$gen_call', From, miOpenPort}, #state{listenPort = LPort} = State) ->
+handleMsg({'$gen_call', From, miOpenPort}, #state{listenPort = LPort} = _State) ->
    gen_server:reply(From, LPort),
-   {ok, State};
+   kpS;
 
-handleMsg(_Msg, State) ->
+handleMsg(_Msg, _State) ->
    ?ntErr("~p unexpected info: ~p ~n", [?MODULE, _Msg]),
-   {ok, State}.
+   kpS.
 
-terminate(_Reason, #state{oSock = LSock, listenAddr = Addr, listenPort = Port}) ->
+terminate(Reason, #state{oSock = LSock, listenAddr = Addr, listenPort = Port}) ->
    ?ntInfo("stopped on ~s:~p ~n", [inet:ntoa(Addr), Port]),
    catch gen_udp:close(LSock),
-   ok.
+   exit(Reason).
 
 -spec getOpts(pid()) -> [listenOpt()].
 getOpts(Listener) ->
@@ -197,5 +198,5 @@ peerDown(DownPid, Peers, State) ->
       {ok, Peer} ->
          {ok, delPeer(Peer, DownPid, State)};
       error ->
-         {ok, State}
+         kpS
    end.

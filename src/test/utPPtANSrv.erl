@@ -5,7 +5,7 @@
 -include("eNet.hrl").
 -include("ntCom.hrl").
 
--export([newConn/1]).
+-export([newConn/2]).
 
 -export([start/2, start_link/1]).
 
@@ -33,7 +33,7 @@ start(Name, Port) ->
 start_link(Sock) ->
    {ok, proc_lib:spawn_link(?MODULE, init, [Sock])}.
 
-newConn(Sock) ->
+newConn(Sock, _) ->
    start_link(Sock).
 
 init(_Sock) ->
