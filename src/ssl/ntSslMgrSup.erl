@@ -23,8 +23,8 @@ init({SupName, Port, ListenOpts}) ->
    AptSupName = ntCom:asName(ssl, SupName),
    ListenName = ntCom:lsName(ssl, SupName),
 
-   SslOpts = ?getLValue(sslOpts, ListenOpts, []),
-   SslHSTet = ?getLValue(sslHSTet, ListenOpts, ?DefSslHSTet),
+   SslOpts = ?ntGLV(sslOpts, ListenOpts, []),
+   SslHSTet = ?ntGLV(sslHSTet, ListenOpts, ?DefSslHSTet),
 
    ChildSpecs = [
       #{

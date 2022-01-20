@@ -88,7 +88,7 @@ isIpv6({A, B, C, D, E, F, G, H}) ->
 isIpv6(_) ->
    false.
 
-getListValue(Key, List, Default) ->
+gLV(Key, List, Default) ->
    case lists:keyfind(Key, 1, List) of
       false ->
          Default;

@@ -91,13 +91,13 @@ loop(Parent, State) ->
 }).
 
 init({AptSupName, Port, ListenOpts}) ->
-   TcpOpts = ?getLValue(tcpOpts, ListenOpts, []),
+   TcpOpts = ?ntGLV(tcpOpts, ListenOpts, []),
    %% Don't active the socket...
    case gen_tcp:listen(Port, lists:keystore(active, 1, TcpOpts, {active, false})) of
       {ok, LSock} ->
-         AptCnt = ?getLValue(aptCnt, ListenOpts, ?AptCnt),
-         ConMod = ?getLValue(conMod, ListenOpts, undefined),
-         ConArgs = ?getLValue(conArgs, ListenOpts, undefined),
+         AptCnt = ?ntGLV(aptCnt, ListenOpts, ?AptCnt),
+         ConMod = ?ntGLV(conMod, ListenOpts, undefined),
+         ConArgs = ?ntGLV(conArgs, ListenOpts, undefined),
          startAcceptor(AptCnt, LSock, AptSupName, ConMod, ConArgs),
          {ok, {LAddr, LPort}} = inet:sockname(LSock),
          % ?ntInfo("success to listen on ~p ~n", [Port]),
@@ -118,9 +118,7 @@ handleMsg({'$gen_call', From, miListenPort}, #state{listenPort = LPort} = _State
 handleMsg(_Msg, _State) ->
    kpS.
 
-terminate(Reason, #state{lSock = LSock, listenAddr = Addr, listenPort = Port}) ->
-   ?ntInfo("stopped on ~s:~p ~n", [inet:ntoa(Addr), Port]),
-   %% 关闭这个监听LSock  监听进程收到tcp_close 然后终止acctptor进程
+terminate(Reason, #state{lSock = LSock}) ->
    catch port_close(LSock),
    exit(Reason).
 

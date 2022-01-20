@@ -96,15 +96,15 @@ loop(Parent, State) ->
 -define(DefUdpOpts, [binary, {reuseaddr, true}]).
 
 init({Port, UoOpts}) ->
-   UdpOpts = ?getLValue(udpOpts, UoOpts, []),
+   UdpOpts = ?ntGLV(udpOpts, UoOpts, []),
    LastUdpOpts = ntCom:mergeOpts(?DefUdpOpts, UdpOpts),
    %% Don't active the socket...
    case gen_udp:open(Port, lists:keystore(active, 1, LastUdpOpts, {active, false})) of
       {ok, OSock} ->
-         AptCnt = ?getLValue(aptCnt, UoOpts, ?AptCnt),
-         ConMod = ?getLValue(conMod, UoOpts, undefined),
+         AptCnt = ?ntGLV(aptCnt, UoOpts, ?AptCnt),
+         ConMod = ?ntGLV(conMod, UoOpts, undefined),
          {ok, {LAddr, LPort}} = inet:sockname(OSock),
-         ?ntInfo("success to open on ~p ~p ~n", [LAddr, LPort]),
+         % ?ntInfo("success to open on ~p ~p ~n", [LAddr, LPort]),
          ok = inet:setopts(OSock, [{active, 100}]),
          {ok, #state{listenAddr = LAddr, listenPort = LPort, oSock = OSock, conMod = ConMod, opts = [{acceptors, AptCnt}, {tcpOpts, LastUdpOpts}]}};
       {error, Reason} ->
@@ -174,8 +174,7 @@ handleMsg(_Msg, _State) ->
    ?ntErr("~p unexpected info: ~p ~n", [?MODULE, _Msg]),
    kpS.
 
-terminate(Reason, #state{oSock = LSock, listenAddr = Addr, listenPort = Port}) ->
-   ?ntInfo("stopped on ~s:~p ~n", [inet:ntoa(Addr), Port]),
+terminate(Reason, #state{oSock = LSock}) ->
    catch gen_udp:close(LSock),
    exit(Reason).
 

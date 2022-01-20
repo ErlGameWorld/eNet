@@ -23,10 +23,10 @@ init({SupName, Port, ListenOpts}) ->
    AptSupName = ntCom:asName(ssl, SupName),
    ListenName = ntCom:lsName(ssl, SupName),
 
-   SslOpts = ?getLValue(sslOpts, ListenOpts, undefined),
-   SslHSTet = ?getLValue(sslHSTet, ListenOpts, ?DefSslHSTet),
-   ProxyPt = ?getLValue(proxyPt, ListenOpts, false),
-   ProxyPtTet = ?getLValue(proxyPtTet, ListenOpts, ?DefProxyPtTet),
+   SslOpts = ?ntGLV(sslOpts, ListenOpts, undefined),
+   SslHSTet = ?ntGLV(sslHSTet, ListenOpts, ?DefSslHSTet),
+   ProxyPt = ?ntGLV(proxyPt, ListenOpts, false),
+   ProxyPtTet = ?ntGLV(proxyPtTet, ListenOpts, ?DefProxyPtTet),
 
    ChildSpecs = [
       #{
