@@ -36,5 +36,5 @@ loop(Num, Sock) ->
    end.
 
 send(N, Sock) ->
-   gen_tcp:send(Sock, [integer_to_list(N), ":", <<"Hello, eSockd!">>]).
+   ntCom:syncSend(Sock, [integer_to_list(N), ":", <<"Hello, eSockd!">>]).
 
