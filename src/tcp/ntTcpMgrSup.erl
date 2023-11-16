@@ -15,7 +15,7 @@
 
 -spec(start_link(SupName :: atom(), Port :: inet:port_number(), ListenOpts :: [listenOpt()]) -> {ok, pid()} | {error, term()}).
 start_link(SupName, Port, ListenOpts) ->
-   supervisor:start_link({local, SupName}, ?MODULE, {SupName, Port, ListenOpts}).
+   supervisor:start_link({local, ntCom:supName(tcp, SupName)}, ?MODULE, {SupName, Port, ListenOpts}).
 
 init({SupName, Port, ListenOpts}) ->
    SupFlag = #{strategy => one_for_one, intensity => 100, period => 3600},

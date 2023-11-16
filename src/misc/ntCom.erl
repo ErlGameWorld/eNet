@@ -113,6 +113,13 @@ lsName(ssl, PrName) ->
 lsName(udp, PrName) ->
 	binary_to_atom(<<(atom_to_binary(PrName))/binary, "URs">>).
 
+supName(tcp, PrName) ->
+	binary_to_atom(<<(atom_to_binary(PrName))/binary, "TSup">>);
+supName(ssl, PrName) ->
+	binary_to_atom(<<(atom_to_binary(PrName))/binary, "SSup">>);
+supName(udp, PrName) ->
+	binary_to_atom(<<(atom_to_binary(PrName))/binary, "USup">>).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% This is a generic "port_command" interface used by TCP, UDP, SCTP, depending
 %% on the driver it is mapped to, and the "Data". It actually sends out data,--
