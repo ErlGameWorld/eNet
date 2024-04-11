@@ -16,7 +16,7 @@
    , {send_timeout, 15000}
    , {keepalive, true}
    , {exit_on_close, true}
-   , {back_log, 1024}
+   , {backlog, 1024}
 ]).
 
 
