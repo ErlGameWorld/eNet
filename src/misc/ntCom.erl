@@ -23,7 +23,7 @@ getPort(Port) -> Port.
 fixIpPort(IpOrStr, Port) ->
 	if
 		is_list(IpOrStr), is_integer(Port) ->
-			{ok, IP} = inet:parse_address(v),
+			{ok, IP} = inet:parse_address(IpOrStr),
 			{IP, Port};
 		is_tuple(IpOrStr), is_integer(Port) ->
 			case isIpv4OrIpv6(IpOrStr) of
