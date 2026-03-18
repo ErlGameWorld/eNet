@@ -98,19 +98,27 @@ handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, ref = Ref, conMod
          inet_db:register_socket(Sock, SockMod),
          try ConMod:newConn(Sock, ConArgs) of
             {ok, Pid} ->
-               gen_tcp:controlling_process(Sock, Pid),
-               Pid ! {?mSockReady, Sock},
-               newAsyncAccept(LSock, State);
+               case gen_tcp:controlling_process(Sock, Pid) of
+                  ok ->
+                     Pid ! {?mSockReady, Sock},
+                     newAsyncAccept(LSock, State);
+                  {error, Reason} ->
+                     ?ntErr("gen_tcp:controlling_process error ~p~n", [Reason]),
+                     catch port_close(Sock),
+                     newAsyncAccept(LSock, State)
+               end;
             {close, Reason} ->
                ?ntErr("handleMsg ConMod:newAcceptor return close ~p~n", [Reason]),
                catch port_close(Sock),
                newAsyncAccept(LSock, State);
             _Ret ->
                ?ntErr("ConMod:newAcceptor return error ~p~n", [_Ret]),
-               {stop, error_ret}
+               catch port_close(Sock),
+               newAsyncAccept(LSock, State)
          catch
             E:R:S ->
                ?ntErr("ConMod:newConn crash: ~p:~p~n~p~n ~n ", [E, R, S]),
+               catch port_close(Sock),
                newAsyncAccept(LSock, State)
          end;
       {error, closed} ->

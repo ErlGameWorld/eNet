@@ -63,36 +63,45 @@
 recv(Sock, Timeout) ->
    {ok, OriginOpts} = inet:getopts(Sock, [mode, active, packet]),
    ok = inet:setopts(Sock, [binary, {active, once}, {packet, line}]),
-   receive
-   %% V1 TCP
-      {_, Sock, <<"PROXY TCP", Proto, ?SPACE, ProxyInfo/binary>>} ->
-         inet:setopts(Sock, OriginOpts),
-         parse_v1(Sock, ProxyInfo, #proxy_socket{inet = inet_family(Proto)});
-   %% V1 Unknown
-      {_, _Sock, <<"PROXY UNKNOWN", _ProxyInfo/binary>>} ->
-         inet:setopts(Sock, OriginOpts),
-         {ok, Sock, #proxy_socket{}};
-   %% V2 TCP
-      {_, _Sock, <<"\r\n">>} ->
-         inet:setopts(Sock, [{active, false}, {packet, raw}]),
-         {ok, Header} = gen_tcp:recv(Sock, 14, 1000),
-         <<?SIG, 2:4, Cmd:4, AF:4, Trans:4, Len:16>> = Header,
-         case gen_tcp:recv(Sock, Len, 1000) of
-            {ok, ProxyInfo} ->
-               inet:setopts(Sock, OriginOpts),
-               parse_v2(Cmd, Trans, ProxyInfo, #proxy_socket{inet = inet_family(AF)}, Sock);
-            {error, Reason} ->
-               {error, {recv_proxy_info_error, Reason}}
-         end;
-      {tcp_error, _Sock, Reason} ->
-         {error, {recv_proxy_info_error, Reason}};
-      {tcp_closed, _Sock} ->
-         {error, {recv_proxy_info_error, tcp_closed}};
-      {_, _Sock, ProxyInfo} ->
-         {error, {invalid_proxy_info, ProxyInfo}}
+   try
+      receive
+      %% V1 TCP
+         {_, Sock, <<"PROXY TCP", Proto, ?SPACE, ProxyInfo/binary>>} ->
+            parse_v1(Sock, ProxyInfo, #proxy_socket{inet = inet_family(Proto)});
+      %% V1 Unknown
+         {_, _Sock, <<"PROXY UNKNOWN", _ProxyInfo/binary>>} ->
+            {ok, Sock, #proxy_socket{}};
+      %% V2 TCP
+         {_, _Sock, <<"\r\n">>} ->
+            inet:setopts(Sock, [{active, false}, {packet, raw}]),
+            case gen_tcp:recv(Sock, 14, 1000) of
+               {ok, <<?SIG, 2:4, Cmd:4, AF:4, Trans:4, Len:16>>} ->
+                  case gen_tcp:recv(Sock, Len, 1000) of
+                     {ok, ProxyInfo} ->
+                        parse_v2(Cmd, Trans, ProxyInfo, #proxy_socket{inet = inet_family(AF)}, Sock);
+                     {error, Reason} ->
+                        {error, {recv_proxy_info_error, Reason}}
+                  end;
+               {ok, Header} ->
+                  {error, {invalid_proxy_info, Header}};
+               {error, Reason} ->
+                  {error, {recv_proxy_info_error, Reason}}
+            end;
+         {tcp_error, _Sock, Reason} ->
+            {error, {recv_proxy_info_error, Reason}};
+         {tcp_closed, _Sock} ->
+            {error, {recv_proxy_info_error, tcp_closed}};
+         {_, _Sock, ProxyInfo} ->
+            {error, {invalid_proxy_info, ProxyInfo}}
+      after
+         Timeout ->
+            {error, proxy_proto_timeout}
+      end
+   catch
+      C:R ->
+         {error, {invalid_proxy_info, {C, R}}}
    after
-      Timeout ->
-         {error, proxy_proto_timeout}
+      catch inet:setopts(Sock, OriginOpts)
    end.
 
 parse_v1(Sock, ProxyInfo, ProxySock) ->
