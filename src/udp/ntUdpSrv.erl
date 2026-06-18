@@ -175,7 +175,9 @@ handleMsg(_Msg, _State) ->
    kpS.
 
 terminate(Reason, #state{oSock = LSock}) ->
-   catch gen_udp:close(LSock),
+   try gen_udp:close(LSock)
+   catch _:_ -> ok
+   end,
    exit(Reason).
 
 -spec getOpts(pid()) -> [listenOpt()].

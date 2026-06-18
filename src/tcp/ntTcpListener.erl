@@ -119,7 +119,9 @@ handleMsg(_Msg, _State) ->
    kpS.
 
 terminate(Reason, #state{lSock = LSock}) ->
-   catch port_close(LSock),
+   try port_close(LSock)
+   catch _:_ -> ok
+   end,
    exit(Reason).
 
 startAcceptor(0, _LSock, _AptSupName, _ConMod, _ConArgs) ->

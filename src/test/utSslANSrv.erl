@@ -76,7 +76,9 @@ handle_info(_Info, State) ->
    {noreply, State}.
 
 terminate(_Reason, #state{socket = Sock}) ->
-   catch ssl:close(Sock).
+   try ssl:close(Sock)
+   catch _:_ -> ok
+   end.
 
 code_change(_OldVsn, State, _Extra) ->
    {ok, State}.

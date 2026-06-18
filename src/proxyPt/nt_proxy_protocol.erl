@@ -101,7 +101,9 @@ recv(Sock, Timeout) ->
       C:R ->
          {error, {invalid_proxy_info, {C, R}}}
    after
-      catch inet:setopts(Sock, OriginOpts)
+      try inet:setopts(Sock, OriginOpts)
+      catch _:_ -> ok
+      end
    end.
 
 parse_v1(Sock, ProxyInfo, ProxySock) ->

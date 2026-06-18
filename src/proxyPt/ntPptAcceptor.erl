@@ -111,21 +111,29 @@ handleMsg({inet_async, LSock, Ref, Msg}, #state{lSock = LSock, sslOpts = SslOpts
                      newAsyncAccept(LSock, State);
                   {error, Reason} ->
                      ?ntErr("gen_tcp:controlling_process error ~p~n", [Reason]),
-                     catch port_close(Sock),
+                     try port_close(Sock)
+                     catch _:_ -> ok
+                     end,
                      newAsyncAccept(LSock, State)
                end;
             {close, Reason} ->
                ?ntErr("handleMsg ConMod:newAcceptor return close ~p~n", [Reason]),
-               catch port_close(Sock),
+               try port_close(Sock)
+               catch _:_ -> ok
+               end,
                newAsyncAccept(LSock, State);
             _Ret ->
                ?ntErr("ConMod:newAcceptor return error ~p~n", [_Ret]),
-               catch port_close(Sock),
+               try port_close(Sock)
+               catch _:_ -> ok
+               end,
                newAsyncAccept(LSock, State)
          catch
             E:R:S ->
                ?ntErr("ConMod:newConn crash: ~p:~p~n~p~n ~n ", [E, R, S]),
-               catch port_close(Sock),
+               try port_close(Sock)
+               catch _:_ -> ok
+               end,
                newAsyncAccept(LSock, State)
          end;
       {error, closed} ->
@@ -169,14 +177,18 @@ pptAndHS(OSock, SslOpts, SslHSTet, ProxyPt, ProxyPtTet) ->
                   {ok, SslSock, _Ext} -> %% OTP 21.0
                      {ok, SslSock, ProxySock};
                   {error, _} = Err ->
-                     catch port_close(TemSock),
+                     try port_close(TemSock)
+                     catch _:_ -> ok
+                     end,
                      Err
                end;
             _ ->
                PptRet
          end;
       _ ->
-         catch port_close(OSock),
+         try port_close(OSock)
+         catch _:_ -> ok
+         end,
          PptRet
    end.
 

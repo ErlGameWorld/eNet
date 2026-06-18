@@ -70,7 +70,9 @@ handle_info(_Info, State) ->
    {noreply, State}.
 
 terminate(_Reason, #state{socket = Sock}) ->
-   catch gen_tcp:close(Sock).
+   try gen_tcp:close(Sock)
+   catch _:_ -> ok
+   end.
 
 code_change(_OldVsn, State, _Extra) ->
    {ok, State}.
