@@ -126,9 +126,17 @@ supName(udp, PrName) ->
 %% NOT delegating this task to any back-end.  For SCTP, this function MUST NOT
 %% be called directly -- use "sendmsg" instead:
 %%
+%% 两类回复消息别混:
+%%   {inet_reply, S, Status[, MRef]}  "发送"的回复(syncSend/asyncSend)
+%%   {inet_async, S, Ref, Msg}        async_recv/async_accept 一类操作的回复
+%% 发之前把 MRef 编进命令头(monitor(port, S)):当前 OTP 的回复会带上这个 MRef(4 元组),
+%% 老 OTP(17.5 那种)的回复不带(3 元组)。
+%%
 syncSend(S, Data) ->
 	syncSend(S, Data, []).
 
+%% 同步发送:就地等回复,拿到 {inet_reply, S, Status, MRef} 或 {'DOWN', ...} 才返回,
+%% 回复消息在本函数内被消费,调用者不会再看到它。
 syncSend(S, Data, OptList) when is_port(S), is_list(OptList) ->
 	MRef = monitor(port, S),
 	MRefBin = term_to_binary(MRef, [local]),
@@ -138,6 +146,8 @@ syncSend(S, Data, OptList) when is_port(S), is_list(OptList) ->
 		erlang:port_command(S, [<<MRefBinSize:16, MRefBin/binary>>, Data], OptList)
 	of
 		false -> % Port busy when nosuspend option was passed
+			%% 命令没入队,不会有回复,monitor 只能自己回收
+			demonitor(MRef, [flush]),
 			{error, busy};
 		true ->
 			receive
@@ -148,12 +158,25 @@ syncSend(S, Data, OptList) when is_port(S), is_list(OptList) ->
 					{error, closed}
 			end
 	catch error: _ ->
+		%% port_command 抛错(端口已关/参数非法),同样不会有回复
+		demonitor(MRef, [flush]),
 		{error, einval}
 	end.
 
 asyncSend(S, Data) ->
 	asyncSend(S, Data, []).
 
+%% 异步发送:只把命令交给 port,不等结果;发送结果稍后异步回报给调用进程。
+%%   ok              —— 命令已被 port 接受,结果见下面的回复消息
+%%   {error, busy}   —— nosuspend 且 port 正忙,命令未入队;monitor 已回收,不会再有回复
+%%   {error, einval} —— port_command 抛错(端口已关/参数非法);monitor 已回收,不会再有回复
+%%
+%% 调用进程必须在自己的 handle_info 里消费这些消息,并在收到后 demonitor:
+%%   {inet_reply, S, ok, MRef}              发送成功
+%%   {inet_reply, S, {error, Reason}, MRef} 发送失败
+%%   {'DOWN', MRef, port, S, Reason}        端口关闭(端口 DOWN 时 monitor 自动结束)
+%% UDP/SCTP 在底层 would block 时还会先来一条不带状态的 {inet_reply, S, MRef}:
+%% 它只表示"命令收下了但数据还没发出去",不能当成结束,后面还会来真正的回复。
 asyncSend(S, Data, OptList) when is_port(S), is_list(OptList) ->
 	MRef = monitor(port, S),
 	MRefBin = term_to_binary(MRef, [local]),
@@ -163,10 +186,14 @@ asyncSend(S, Data, OptList) when is_port(S), is_list(OptList) ->
 		erlang:port_command(S, [<<MRefBinSize:16, MRefBin/binary>>, Data], OptList)
 	of
 		false -> % Port busy when nosuspend option was passed
+			%% 命令没入队,不会有回复,monitor 只能自己回收
+			demonitor(MRef, [flush]),
 			{error, busy};
 		true ->
 			ok
 	catch error: _ ->
+		%% port_command 抛错(端口已关/参数非法),同样不会有回复
+		demonitor(MRef, [flush]),
 		{error, einval}
 	end.
 
